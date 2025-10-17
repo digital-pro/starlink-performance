@@ -1,7 +1,8 @@
 {
   "version": 2,
   "functions": {
-    "api/netdata-proxy.js": { "maxDuration": 10 }
+    "api/netdata-proxy.js": { "maxDuration": 10 },
+    "api/promql.js": { "maxDuration": 10 }
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },

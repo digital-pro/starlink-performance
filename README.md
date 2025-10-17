@@ -5,6 +5,7 @@ A performance throughput dashboard (Vue + React, TypeScript) for the Levante fra
 - Vue app: `apps/vue-dashboard`
 - React app: `apps/react-dashboard`
 - API proxy: `api/netdata-proxy.js` (Vercel serverless function)
+- PromQL proxy: `api/promql.js` (Grafana Cloud / Prometheus)
 
 ## Quick start
 
@@ -60,9 +61,26 @@ NETDATA_URL=https://netdata.example.com npm run dev:react
 NETDATA_URL=https://netdata.example.com NETDATA_AUTH_BASIC=$(printf 'user:pass' | base64 -w0) npm run dev:vue
 ```
 
+## Grafana Cloud / Prometheus (PromQL)
+
+Set `PROM_URL` to your Prometheus-compatible API base (ending in `/api/v1`), plus an auth method:
+
+- `PROM_URL`: e.g. `https://prometheus-prod-10-prod-us-central-0.grafana.net/api/v1`
+- Auth (choose one):
+  - `PROM_BASIC`: base64 of `username:token`
+  - `PROM_USER` + `PROM_TOKEN`: will be converted to Basic automatically
+  - `PROM_BEARER`: bearer token
+
+Example queries:
+
+- Instant: `/api/promql?query=up{job="starlink"}`
+- Range: `/api/promql?query=avg_over_time(starlink_latency_ms[5m])&start=1734489600&end=1734493200&step=30`
+
+Use this for fully cloud-hosted metrics and add PromQL-backed components in the UI as needed.
+
 ## Deployment (Vercel)
 
-- Repo root contains `vercel.json` that serves static files from `public/` and exposes `/api/netdata`.
+- Repo root contains `vercel.json` that serves static files from `public/` and exposes `/api/netdata` and `/api/promql`.
 - The root build script emits each app into `public/vue/` and `public/react/`.
 - Default route `/` points to `public/vue/index.html`. React app is at `/react`.
-- Set one of `NETDATA_URL` or `NETDATA_HOST` in Vercel Project Settings → Environment Variables. Add `NETDATA_AUTH_BASIC` or `NETDATA_BEARER` if your Netdata is protected.
+- Set `NETDATA_URL`/`NETDATA_HOST` and/or `PROM_URL` (+ auth) in Vercel Project Settings → Environment Variables.
