@@ -1,0 +1,17 @@
+{
+  "name": "levante-performance",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "postinstall": "echo done",
+    "build": "npm run build -w @levante/vue-dashboard && npm run build -w @levante/react-dashboard && node scripts/prepare-public.mjs",
+    "preview": "npx http-server public -p 5175 -c-1",
+    "dev:vue": "npm run dev -w @levante/vue-dashboard",
+    "dev:react": "npm run dev -w @levante/react-dashboard"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
