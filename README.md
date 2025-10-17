@@ -1,9 +1,8 @@
 # Levante Performance
 
-A performance throughput dashboard (Vue + React, TypeScript) for the Levante framework. The initial module focuses on Starlink connectivity metrics via Netdata.
+A performance throughput dashboard (Vue + TypeScript) for the Levante framework. The initial module focuses on Starlink connectivity metrics via Netdata.
 
 - Vue app: `apps/vue-dashboard`
-- React app: `apps/react-dashboard`
 - API proxy: `api/netdata-proxy.js` (Vercel serverless function)
 - PromQL proxy: `api/promql.js` (Grafana Cloud / Prometheus)
 
@@ -15,7 +14,7 @@ A performance throughput dashboard (Vue + React, TypeScript) for the Levante fra
 npm install
 ```
 
-- Build both dashboards and prepare static output for Vercel:
+- Build dashboard and prepare static output for Vercel:
 
 ```bash
 npm run build
@@ -30,8 +29,7 @@ npm run preview
 - Development:
 
 ```bash
-npm run dev:vue
-npm run dev:react
+npm run dev
 ```
 
 ## Netdata (Agent and Cloud)
@@ -52,13 +50,13 @@ Examples:
 
 ```bash
 # Local dev hitting local agent
-NETDATA_HOST=localhost npm run dev:vue
+NETDATA_HOST=localhost npm run dev
 
 # Local dev hitting reverse-proxied remote agent
-NETDATA_URL=https://netdata.example.com npm run dev:react
+NETDATA_URL=https://netdata.example.com npm run dev
 
 # With basic auth (username:password -> base64)
-NETDATA_URL=https://netdata.example.com NETDATA_AUTH_BASIC=$(printf 'user:pass' | base64 -w0) npm run dev:vue
+NETDATA_URL=https://netdata.example.com NETDATA_AUTH_BASIC=$(printf 'user:pass' | base64 -w0) npm run dev
 ```
 
 ## Grafana Cloud / Prometheus (PromQL)
@@ -81,6 +79,6 @@ Use this for fully cloud-hosted metrics and add PromQL-backed components in the 
 ## Deployment (Vercel)
 
 - Repo root contains `vercel.json` that serves static files from `public/` and exposes `/api/netdata` and `/api/promql`.
-- The root build script emits each app into `public/vue/` and `public/react/`.
-- Default route `/` points to `public/vue/index.html`. React app is at `/react`.
+- The root build script emits the Vue app into `public/`.
+- Default route `/` points to `public/index.html`.
 - Set `NETDATA_URL`/`NETDATA_HOST` and/or `PROM_URL` (+ auth) in Vercel Project Settings → Environment Variables.

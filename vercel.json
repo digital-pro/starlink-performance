@@ -1,19 +1,17 @@
 {
   "version": 2,
+  "alias": [
+    "levante-performance.vercel.app"
+  ],
   "functions": {
     "api/netdata-proxy.js": { "maxDuration": 10 },
     "api/promql.js": { "maxDuration": 10 }
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
-
     { "source": "/favicon.ico", "destination": "/public/favicon.ico" },
-
-    { "source": "/react", "destination": "/public/react/index.html" },
-    { "source": "/react/(.*)", "destination": "/public/react/$1" },
-
-    { "source": "/", "destination": "/public/vue/index.html" },
-    { "source": "/(.*)", "destination": "/public/vue/$1" }
+    { "source": "/", "destination": "/public/index.html" },
+    { "source": "/(.*)", "destination": "/public/$1" }
   ],
   "headers": [
     { "source": "/", "headers": [{ "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }] },
