@@ -1,8 +1,10 @@
 export default async function handler(req, res) {
   try {
-    const netdataHost = process.env.NETDATA_HOST;
-    if (!netdataHost) {
-      res.status(500).json({ error: "NETDATA_HOST env var not set" });
+    const baseUrl = (process.env.NETDATA_URL || '').trim().replace(/\/$/, '');
+    const host = (process.env.NETDATA_HOST || '').trim();
+
+    if (!baseUrl && !host) {
+      res.status(500).json({ error: "NETDATA_URL or NETDATA_HOST env var must be set" });
       return;
     }
 
@@ -17,9 +19,17 @@ export default async function handler(req, res) {
       return;
     }
 
-    const netdataUrl = `http://${netdataHost}:19999/api/v1/data?chart=${encodeURIComponent(chart)}&after=${encodeURIComponent(after)}&points=${encodeURIComponent(points)}&format=${encodeURIComponent(format)}`;
+    const upstreamBase = baseUrl || `http://${host}:19999`;
+    const netdataUrl = `${upstreamBase}/api/v1/data?chart=${encodeURIComponent(chart)}&after=${encodeURIComponent(after)}&points=${encodeURIComponent(points)}&format=${encodeURIComponent(format)}`;
 
-    const response = await fetch(netdataUrl);
+    const headers = {};
+    if (process.env.NETDATA_AUTH_BASIC) {
+      headers["Authorization"] = `Basic ${process.env.NETDATA_AUTH_BASIC}`; // value should be base64(username:password)
+    } else if (process.env.NETDATA_BEARER) {
+      headers["Authorization"] = `Bearer ${process.env.NETDATA_BEARER}`;
+    }
+
+    const response = await fetch(netdataUrl, { headers });
     if (!response.ok) {
       res.status(response.status).json({ error: `Netdata error ${response.status}` });
       return;
