@@ -7,3 +7,5 @@ public/
 apps/*/dist/
 .vercel
 secrets/
+# local deployment files
+deployment/remote-write.*.yml

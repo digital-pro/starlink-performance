@@ -1,0 +1,16 @@
+# Merge into your prometheus.yml on each node
+# Replace INSTANCE_ID and TOKEN accordingly (or use generate-remote-write.sh)
+
+external_labels:
+  site: ${SITE}
+  prometheus: ${HOSTNAME}
+
+remote_write:
+  - url: https://prometheus-prod-36-prod-us-west-0.grafana.net/api/prom/api/v1/write
+    basic_auth:
+      username: 2743807            # your stack instance ID
+      password: GLC_WRITE_TOKEN    # your glc_ write token
+    # Optional: reduce cardinality
+    # write_relabel_configs:
+    #   - action: labeldrop
+    #     regex: "(container_id|pod_uid)"
