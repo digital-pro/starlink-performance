@@ -6,3 +6,4 @@ npm-debug.log*
 public/
 apps/*/dist/
 .vercel
+secrets/
