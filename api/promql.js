@@ -1,10 +1,11 @@
 export default async function handler(req, res) {
   try {
-    const baseUrl = (process.env.PROM_URL || '').trim().replace(/\/$/, '');
-    if (!baseUrl) {
-      res.status(500).json({ error: "PROM_URL env var not set (e.g. https://prometheus.example.com/api/v1)" });
+    const raw = (process.env.PROM_URL || '').trim();
+    if (!raw) {
+      res.status(500).json({ error: "PROM_URL env var not set", hint: "Set PROM_URL to your Prometheus API base (ends with /api/v1)" });
       return;
     }
+    const baseUrl = raw.replace(/\/$/, '');
 
     const url = new URL(req.url, 'http://localhost');
     const query = url.searchParams.get('query');
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
 
     const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
     if (process.env.PROM_BASIC) {
-      headers['Authorization'] = `Basic ${process.env.PROM_BASIC}`; // base64(username:password)
+      headers['Authorization'] = `Basic ${process.env.PROM_BASIC}`;
     } else if (process.env.PROM_BEARER) {
       headers['Authorization'] = `Bearer ${process.env.PROM_BEARER}`;
     } else if (process.env.PROM_USER && process.env.PROM_TOKEN) {
@@ -38,11 +39,15 @@ export default async function handler(req, res) {
       headers['Authorization'] = `Basic ${basic}`;
     }
 
-    const upstream = `${baseUrl}/${endpoint}?${params.toString()}`;
+    // Normalize to include /api/v1 if caller passed base without it
+    const apiBase = /\/api\/v1$/.test(baseUrl) ? baseUrl : `${baseUrl.replace(/\/$/, '')}/api/v1`;
+    const upstream = `${apiBase}/${endpoint}?${params.toString()}`;
+
     const response = await fetch(upstream, { headers });
     const text = await response.text();
 
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('x-upstream-url', upstream);
     res.setHeader('Content-Type', response.headers.get('Content-Type') || 'application/json');
     res.status(response.status).send(text);
   } catch (error) {
