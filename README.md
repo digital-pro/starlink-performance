@@ -1,84 +1,194 @@
 # Levante Performance
 
-A performance throughput dashboard (Vue + TypeScript) for the Levante framework. The initial module focuses on Starlink connectivity metrics via Netdata.
+A cloud-hosted performance dashboard for Starlink, built with Vue + TypeScript and deployed on Vercel. The UI reads metrics from Grafana Cloud Prometheus via a secure serverless proxy.
 
-- Vue app: `apps/vue-dashboard`
-- API proxy: `api/netdata-proxy.js` (Vercel serverless function)
-- PromQL proxy: `api/promql.js` (Grafana Cloud / Prometheus)
+- Frontend (Vue 3 + Vite): `apps/vue-dashboard`
+- Serverless APIs (Vercel): `api/promql.js` (Prometheus proxy), `api/netdata-proxy.js` (optional Netdata proxy)
+- Deployment helpers: `scripts/deploy.mjs`, `scripts/prepare-public.mjs`
+- Prometheus remote_write helpers: `deployment/*`
 
-## Quick start
+---
 
-- Install dependencies (workspace):
+## How it works
+
+- The Vue app requests data from our own endpoint `GET /api/promql`.
+- `api/promql.js` forwards the request to your Grafana Cloud Prometheus with the credentials you configure in Vercel.
+- The UI shows four key panels and cards, all rounded to three decimals:
+  - Down (Mbps): `avg_over_time(starlink_dish_downlink_throughput_bytes[1m]) * 8 / 1e6`
+  - Up (Mbps): `avg_over_time(starlink_dish_uplink_throughput_bytes[1m]) * 8 / 1e6`
+  - Latency (ms): `starlink_dish_pop_ping_latency_seconds * 1000`
+  - Packet Loss (%): `starlink_dish_pop_ping_drop_ratio * 100`
+- Header buttons:
+  - “Open in Grafana” → your internal dashboard in Grafana Cloud (signed-in view)
+  - “Public view” → your public dashboard URL (no login)
+
+> Note: The app is now Prometheus-only. The Netdata proxy remains for optional/dev use but is not active in the UI.
+
+---
+
+## Prerequisites
+
+- Node.js 18+
+- A Grafana Cloud stack with Prometheus enabled
+- Vercel account + Vercel CLI (the `deploy.mjs` uses the CLI under the hood)
+
+---
+
+## Install & run
 
 ```bash
+# from repo root
 npm install
-```
 
-- Build dashboard and prepare static output for Vercel:
+# local dev (Vue dev server)
+npm run dev:vue
 
-```bash
+# build all and stage static assets into ./public
 npm run build
+
+# preview the built site locally
+npm run preview  # serves ./public on http://localhost:5175
 ```
 
-- Local preview of built static assets:
+---
 
-```bash
-npm run preview
-```
+## Configure Grafana Cloud access (for /api/promql)
 
-- Development:
+Set these in Vercel → Project → Settings → Environment Variables (Production):
 
-```bash
-npm run dev
-```
-
-## Netdata (Agent and Cloud)
-
-Set one of the following environment variables (priority in order):
-
-- `NETDATA_URL` (recommended for remote/cloud): full base URL to a reachable Netdata agent or reverse proxy, e.g. `https://netdata.example.com` or `https://proxy.example.com/netdata`.
-- `NETDATA_HOST` (simple local/dev): hostname/IP without protocol; default port 19999 assumed, e.g. `localhost` or `192.168.1.50`.
-
-Optional auth headers for protected endpoints:
-
-- `NETDATA_AUTH_BASIC`: `base64(username:password)` for Basic auth.
-- `NETDATA_BEARER`: `token` string for Bearer auth.
-
-The Vercel function `/api/netdata` will forward to `${NETDATA_URL}/api/v1/data?...` when `NETDATA_URL` is set, otherwise to `http://NETDATA_HOST:19999/api/v1/data?...`.
-
-Examples:
-
-```bash
-# Local dev hitting local agent
-NETDATA_HOST=localhost npm run dev
-
-# Local dev hitting reverse-proxied remote agent
-NETDATA_URL=https://netdata.example.com npm run dev
-
-# With basic auth (username:password -> base64)
-NETDATA_URL=https://netdata.example.com NETDATA_AUTH_BASIC=$(printf 'user:pass' | base64 -w0) npm run dev
-```
-
-## Grafana Cloud / Prometheus (PromQL)
-
-Set `PROM_URL` to your Prometheus-compatible API base (ending in `/api/v1`), plus an auth method:
-
-- `PROM_URL`: e.g. `https://prometheus-prod-10-prod-us-central-0.grafana.net/api/v1`
-- Auth (choose one):
+- `PROM_URL`: Your Prometheus API base. Any of these forms work; the proxy normalizes to `/api/v1`:
+  - `https://<your-stack>.grafana.net/api/prom/api/v1` (recommended)
+  - or `https://prometheus-prod-<region>.grafana.net/api/v1`
+- Choose one auth method:
   - `PROM_BASIC`: base64 of `username:token`
-  - `PROM_USER` + `PROM_TOKEN`: will be converted to Basic automatically
-  - `PROM_BEARER`: bearer token
+  - or `PROM_USER` and `PROM_TOKEN` (the proxy will build Basic for you)
+  - or `PROM_BEARER` (Bearer token)
 
-Example queries:
+Grafana Cloud specifics:
+- For reads, create an Access Policy token with scope `metrics:read` and use your stack’s Instance ID as the username.
+- For remote_write (optional), use scope `metrics:write`.
 
-- Instant: `/api/promql?query=up{job="starlink"}`
-- Range: `/api/promql?query=avg_over_time(starlink_latency_ms[5m])&start=1734489600&end=1734493200&step=30`
+Quick verification (after variables are set and deployed):
+- Health: `GET /api/ping` → `{ ok: true, now: ... }`
+- PromQL instant: `GET /api/promql?query=up`
+- PromQL range: `GET /api/promql?query=up&start=<unix>&end=<unix>&step=30`
+- Series discovery: `GET /api/promql?endpoint=series&match[]=starlink_*`
 
-Use this for fully cloud-hosted metrics and add PromQL-backed components in the UI as needed.
+---
 
-## Deployment (Vercel)
+## Deploy to Vercel
 
-- Repo root contains `vercel.json` that serves static files from `public/` and exposes `/api/netdata` and `/api/promql`.
-- The root build script emits the Vue app into `public/`.
-- Default route `/` points to `public/index.html`.
-- Set `NETDATA_URL`/`NETDATA_HOST` and/or `PROM_URL` (+ auth) in Vercel Project Settings → Environment Variables.
+You can deploy from the command line (CI-friendly):
+
+```bash
+# optional: set a permanent alias for the production deployment
+export VERCEL_ALIAS=levante-performance-digitalpros-projects.vercel.app
+
+# deploy (build → link → deploy → alias)
+npm run deploy
+```
+
+What the script does:
+- `npm run build` builds the Vue app and copies assets to `public/`.
+- Links the directory to the Vercel project (idempotent).
+- Creates a production deployment.
+- If `VERCEL_ALIAS` is set, assigns the alias to the new deployment.
+
+Vercel config:
+- `vercel.json` sends `/api/*` to serverless functions.
+- `/` and all other paths serve the static site from `public/`.
+
+---
+
+## Public Grafana dashboard
+
+To make the Grafana dashboard viewable without login:
+1) Open the dashboard in Grafana (signed in).
+2) Share → Public dashboard → Enable → Select the panels to include → Generate link.
+3) Copy the public URL and paste it into the Vue app button if you want it hard-coded:
+   - Edit `apps/vue-dashboard/src/App.vue` → the anchor with text “Public view”.
+4) Commit and redeploy (or keep the same URL if you don’t change it often).
+
+Tips:
+- Ensure every panel’s Data Source is your Grafana Cloud Prometheus (no “Default”, no “Mixed”).
+- If you see “unsupported data source”, at least one panel points to an unsupported/variable source.
+- Avoid using old shortlinks (`/goto/...`) for public sharing; use `/public-dashboards/...` links.
+
+---
+
+## Optional: Send metrics to Grafana Cloud via Prometheus remote_write
+
+If your metrics originate from local Prometheus instances, use `deployment/` helpers.
+
+- Files:
+  - `deployment/prometheus-remote-write.yml`: snippet for `remote_write` and `external_labels`.
+  - `deployment/generate-remote-write.sh`: fills in your stack and token.
+  - `deployment/apply-remote-write.sh`: safe merge + optional restart.
+  - `deployment/run-wsl-prom.sh`: convenience launcher for a lightweight Prometheus in WSL.
+
+Steps (example):
+```bash
+# save your write token (metrics:write) locally and keep it secret
+printf 'glc_...' > secrets/grafana_write_token.txt
+
+# generate a site-specific snippet
+cd deployment
+INSTANCE_ID=123456 SITE=starlink ./generate-remote-write.sh > remote-write.starlink.yml
+
+# merge into your prometheus.yml and restart Prometheus
+# (or use apply-remote-write.sh with --config /path/to/prometheus.yml)
+```
+
+Common pitfalls:
+- 404 Not Found on remote_write → use Grafana Cloud endpoint `/api/prom/push` (not `/api/prom/api/v1/write`).
+- 401 invalid scope → token must include `metrics:write` for remote_write.
+
+---
+
+## Environment variables (summary)
+
+- `PROM_URL` (required): Grafana Cloud Prometheus API base.
+- `PROM_BASIC` | `PROM_USER` + `PROM_TOKEN` | `PROM_BEARER`: auth for reads.
+- `VERCEL_ALIAS` (optional): alias to assign after deploy.
+- Netdata (optional/dev only):
+  - `NETDATA_URL` or `NETDATA_HOST`
+  - `NETDATA_AUTH_BASIC` or `NETDATA_BEARER`
+
+Secrets convenience (gitignored):
+- `secrets/grafana_env.txt` and `secrets/grafana_token.txt` are local-only helpers; configure the actual values in Vercel.
+
+---
+
+## Troubleshooting
+
+- 404 on `/api/promql` in production:
+  - Ensure `vercel.json` has the `/api/(.*)` rewrite before the SPA catch-all (already configured here).
+- `{ "status":"error", "error":"authentication error: invalid token" }`:
+  - Use a Grafana Cloud Access Policy token with `metrics:read` and correct instance ID username.
+- Public dashboard shows “failed to load application files” or “unsupported data source”:
+  - Bind every panel to your Cloud Prometheus data source; regenerate the public link; avoid `/goto/` links.
+- Down/Up show empty values:
+  - Starlink throughput is often a gauge; we use `avg_over_time(...[1m]) * 8 / 1e6`. Test via:
+    - `/api/promql?query=avg_over_time(starlink_dish_downlink_throughput_bytes%5B1m%5D)*8/1e6`
+- CDN/browser cache:
+  - Hard refresh, use an incognito window, or append a cache-busting query string to the site URL.
+
+---
+
+## Repo layout
+
+```
+apps/vue-dashboard/       # Vue 3 dashboard app
+api/promql.js             # Prometheus proxy (Grafana Cloud)
+api/netdata-proxy.js      # Netdata proxy (optional)
+scripts/deploy.mjs        # Build + deploy + alias
+scripts/prepare-public.mjs# Copy built assets into ./public
+public/                   # Static output served by Vercel
+deployment/               # Remote write helpers for Prometheus → Grafana Cloud
+```
+
+---
+
+## License
+
+MIT (c) Levante Framework
