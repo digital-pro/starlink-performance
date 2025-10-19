@@ -5,7 +5,7 @@
       <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap; color:#667;">
         <small>Data Source: Prometheus (Grafana Cloud)</small>
         <a href="https://levanteperformance.grafana.net/d/ce09662f-cb9a-4531-b88e-e6b165df82fb/starlink-performance?orgId=1&from=now-6h&to=now&timezone=browser&refresh=30s" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #444; background:#222; color:white; border-radius:8px; text-decoration:none;">Open in Grafana</a>
-        <a href="https://levanteperformance.grafana.net/public-dashboards/091a15cdcef5416792762dd5fc8627f5" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #666; background:#444; color:white; border-radius:8px; text-decoration:none;">Public view</a>
+        <a href="https://levanteperformance.grafana.net/public-dashboards/d379680fc19a44e1868560d5e7fe6671" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #666; background:#444; color:white; border-radius:8px; text-decoration:none;">Public view</a>
         <button @click="refreshAll" style="padding:8px 12px; border:1px solid #08c; background:#08c; color:white; border-radius:8px; cursor:pointer;">Refresh</button>
       </div>
     </header>
@@ -121,8 +121,8 @@ async function refreshAll() {
   const q = {
     latency: 'starlink_dish_pop_ping_latency_seconds * 1000',
     packetLoss: 'starlink_dish_pop_ping_drop_ratio * 100',
-    bandwidthDown: 'rate(starlink_dish_downlink_throughput_bytes[5m]) * 8 / 1000000',
-    bandwidthUp: 'rate(starlink_dish_uplink_throughput_bytes[5m]) * 8 / 1000000'
+    bandwidthDown: 'avg_over_time(starlink_dish_downlink_throughput_bytes[1m]) * 8 / 1000000',
+    bandwidthUp: 'avg_over_time(starlink_dish_uplink_throughput_bytes[1m]) * 8 / 1000000'
   } as const;
 
   const [lat, pl, dMbps, uMbps] = await Promise.all([
