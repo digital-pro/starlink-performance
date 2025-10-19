@@ -8,7 +8,7 @@
       </div>
     </header>
 
-    <section style="margin-top: 16px; display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+    <section style="margin-top: 16px; display:grid; grid-template-columns: repeat(2, minmax(280px, 1fr)); gap: 12px;">
       <div v-for="card in metricCards" :key="card.key" style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
         <div style="font-weight:600; color:#445;">{{ card.title }}</div>
         <div style="font-size: 28px; margin-top: 8px; color:#111;">{{ displayValue(card.key) }}</div>
@@ -20,7 +20,7 @@
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Latency (last 10 min)</h3>
-          <small style="color:#778;">starlink_dish_pop_ping_latency_seconds × 1000</small>
+          <small style="color:#778;">starlink_latency_ms</small>
         </div>
         <v-chart :option="latencyOption" autoresize style="height:260px; margin-top:8px;" />
       </div>
@@ -28,7 +28,7 @@
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Bandwidth (Down / Up)</h3>
-          <small style="color:#778;">rate(downlink_bytes[5m]) × 8 / 1e6, rate(uplink_bytes[5m]) × 8 / 1e6</small>
+          <small style="color:#778;">starlink_bandwidth_*_mbps</small>
         </div>
         <v-chart :option="bandwidthOption" autoresize style="height:260px; margin-top:8px;" />
       </div>
@@ -61,16 +61,26 @@ const metrics = ref<Record<string, number | string>>({
   anomalyRate: 'N/A'
 });
 
+// Desired order: Down (upper-left), Latency (upper-right), Up (lower-left), Packet Loss (lower-right)
 const metricCards = [
-  { key: 'latency', title: 'Latency (ms)' },
-  { key: 'packetLoss', title: 'Packet Loss (%)' },
   { key: 'bandwidthDown', title: 'Down (Mbps)' },
+  { key: 'latency', title: 'Latency (ms)' },
   { key: 'bandwidthUp', title: 'Up (Mbps)' },
+  { key: 'packetLoss', title: 'Packet Loss (%)' },
   { key: 'anomalyRate', title: 'Anomaly Rate (%)' }
 ] as const;
 
+function format3(value: number | string): string | number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value.toFixed(3);
+  if (typeof value === 'string') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n.toFixed(3);
+  }
+  return value;
+}
+
 function displayValue(key: typeof metricCards[number]['key']) {
-  return metrics.value[key];
+  return format3(metrics.value[key]);
 }
 
 async function fetchInstantProm(query: string): Promise<number | 'N/A'> {
@@ -97,38 +107,36 @@ async function fetchRangeProm(query: string, seconds = 600, step = 10): Promise<
     if (!Array.isArray(result) || result.length === 0) return [];
     const values = result[0]?.values as Array<[number, string]> | undefined;
     if (!values) return [];
-    return values.map(([ts, v]) => [Number(ts) * 1000, Number(v)]).filter(([, v]) => Number.isFinite(v));
+    const mapped = values.map(([ts, v]) => [Number(ts) * 1000, Number(v)] as [number, number]);
+    return mapped.filter(([, v]) => Number.isFinite(v));
   } catch {
     return [];
   }
 }
 
 async function refreshAll() {
-  // PromQL expressions tailored to your Starlink exporter
   const q = {
-    latencyMs: 'starlink_dish_pop_ping_latency_seconds * 1000',
-    packetLossPct: 'starlink_dish_pop_ping_drop_ratio * 100',
-    downMbps: 'rate(starlink_dish_downlink_throughput_bytes[5m]) * 8 / 1000000',
-    upMbps: 'rate(starlink_dish_uplink_throughput_bytes[5m]) * 8 / 1000000'
+    latency: 'starlink_latency_ms',
+    packetLoss: 'starlink_packet_loss_pct',
+    bandwidthDown: 'starlink_bandwidth_down_mbps',
+    bandwidthUp: 'starlink_bandwidth_up_mbps',
+    anomalyRate: 'starlink_anomaly_rate_pct'
   } as const;
-
-  // Cards
   const [lat, pl, dMbps, uMbps] = await Promise.all([
-    fetchInstantProm(q.latencyMs),
-    fetchInstantProm(q.packetLossPct),
-    fetchInstantProm(q.downMbps),
-    fetchInstantProm(q.upMbps)
+    fetchInstantProm(q.latency),
+    fetchInstantProm(q.packetLoss),
+    fetchInstantProm(q.bandwidthDown),
+    fetchInstantProm(q.bandwidthUp)
   ]);
   metrics.value.latency = lat;
   metrics.value.packetLoss = pl;
   metrics.value.bandwidthDown = dMbps;
   metrics.value.bandwidthUp = uMbps;
 
-  // Charts
-  latencySeries.value = await fetchRangeProm(q.latencyMs, 600, 10);
+  latencySeries.value = await fetchRangeProm(q.latency, 600, 10);
   const [down, up] = await Promise.all([
-    fetchRangeProm(q.downMbps, 600, 10),
-    fetchRangeProm(q.upMbps, 600, 10)
+    fetchRangeProm(q.bandwidthDown, 600, 10),
+    fetchRangeProm(q.bandwidthUp, 600, 10)
   ]);
   bandwidthDownSeries.value = down;
   bandwidthUpSeries.value = up;
