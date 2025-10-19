@@ -31,7 +31,7 @@ external_labels:
   prometheus: \\${HOSTNAME}
 
 remote_write:
-  - url: https://prometheus-prod-36-prod-us-west-0.grafana.net/api/prom/api/v1/write
+  - url: https://prometheus-prod-36-prod-us-west-0.grafana.net/api/prom/push
     basic_auth:
       username: ${INSTANCE_ID}
       password: ${WRITE_TOKEN}

@@ -1,0 +1,17 @@
+{
+	"ulid": "01K7YPKTRAEX3AQE33R1PD2QBZ",
+	"minTime": 1760882400000,
+	"maxTime": 1760889600000,
+	"stats": {
+		"numSamples": 9762,
+		"numSeries": 36,
+		"numChunks": 108
+	},
+	"compaction": {
+		"level": 1,
+		"sources": [
+			"01K7YPKTRAEX3AQE33R1PD2QBZ"
+		]
+	},
+	"version": 1
+}
