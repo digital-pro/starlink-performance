@@ -5,7 +5,7 @@
       <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap; color:#667;">
         <small>Data Source: Prometheus (Grafana Cloud)</small>
         <a href="https://levanteperformance.grafana.net/d/ce09662f-cb9a-4531-b88e-e6b165df82fb/starlink-performance?orgId=1&from=now-6h&to=now&timezone=browser&refresh=30s" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #444; background:#222; color:white; border-radius:8px; text-decoration:none;">Open in Grafana</a>
-        <a href="https://levanteperformance.grafana.net/public-dashboards/b1108a4bedc04e9b81261696842154ca" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #666; background:#444; color:white; border-radius:8px; text-decoration:none;">Public view</a>
+        <a href="https://levanteperformance.grafana.net/public-dashboards/091a15cdcef5416792762dd5fc8627f5" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #666; background:#444; color:white; border-radius:8px; text-decoration:none;">Public view</a>
         <button @click="refreshAll" style="padding:8px 12px; border:1px solid #08c; background:#08c; color:white; border-radius:8px; cursor:pointer;">Refresh</button>
       </div>
     </header>
