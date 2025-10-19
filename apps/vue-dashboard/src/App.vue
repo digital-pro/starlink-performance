@@ -20,7 +20,7 @@
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Latency (last 10 min)</h3>
-          <small style="color:#778;">starlink_latency_ms</small>
+          <small style="color:#778;">starlink_dish_pop_ping_latency_seconds × 1000</small>
         </div>
         <v-chart :option="latencyOption" autoresize style="height:260px; margin-top:8px;" />
       </div>
@@ -28,7 +28,7 @@
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Bandwidth (Down / Up)</h3>
-          <small style="color:#778;">starlink_bandwidth_*_mbps</small>
+          <small style="color:#778;">rate(starlink_dish_*_throughput_bytes[5m]) × 8 / 1e6</small>
         </div>
         <v-chart :option="bandwidthOption" autoresize style="height:260px; margin-top:8px;" />
       </div>
@@ -115,13 +115,14 @@ async function fetchRangeProm(query: string, seconds = 600, step = 10): Promise<
 }
 
 async function refreshAll() {
+  // Use actual Starlink exporter metrics
   const q = {
-    latency: 'starlink_latency_ms',
-    packetLoss: 'starlink_packet_loss_pct',
-    bandwidthDown: 'starlink_bandwidth_down_mbps',
-    bandwidthUp: 'starlink_bandwidth_up_mbps',
-    anomalyRate: 'starlink_anomaly_rate_pct'
+    latency: 'starlink_dish_pop_ping_latency_seconds * 1000',
+    packetLoss: 'starlink_dish_pop_ping_drop_ratio * 100',
+    bandwidthDown: 'rate(starlink_dish_downlink_throughput_bytes[5m]) * 8 / 1000000',
+    bandwidthUp: 'rate(starlink_dish_uplink_throughput_bytes[5m]) * 8 / 1000000'
   } as const;
+
   const [lat, pl, dMbps, uMbps] = await Promise.all([
     fetchInstantProm(q.latency),
     fetchInstantProm(q.packetLoss),
