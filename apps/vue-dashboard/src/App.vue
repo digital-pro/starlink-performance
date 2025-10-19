@@ -20,7 +20,7 @@
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Latency (last 10 min)</h3>
-          <small style="color:#778;">starlink_latency_ms</small>
+          <small style="color:#778;">starlink_dish_pop_ping_latency_seconds × 1000</small>
         </div>
         <v-chart :option="latencyOption" autoresize style="height:260px; margin-top:8px;" />
       </div>
@@ -28,7 +28,7 @@
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Bandwidth (Down / Up)</h3>
-          <small style="color:#778;">starlink_bandwidth_*_mbps</small>
+          <small style="color:#778;">rate(downlink_bytes[5m]) × 8 / 1e6, rate(uplink_bytes[5m]) × 8 / 1e6</small>
         </div>
         <v-chart :option="bandwidthOption" autoresize style="height:260px; margin-top:8px;" />
       </div>
@@ -104,22 +104,31 @@ async function fetchRangeProm(query: string, seconds = 600, step = 10): Promise<
 }
 
 async function refreshAll() {
+  // PromQL expressions tailored to your Starlink exporter
   const q = {
-    latency: 'starlink_latency_ms',
-    packetLoss: 'starlink_packet_loss_pct',
-    bandwidthDown: 'starlink_bandwidth_down_mbps',
-    bandwidthUp: 'starlink_bandwidth_up_mbps',
-    anomalyRate: 'starlink_anomaly_rate_pct'
+    latencyMs: 'starlink_dish_pop_ping_latency_seconds * 1000',
+    packetLossPct: 'starlink_dish_pop_ping_drop_ratio * 100',
+    downMbps: 'rate(starlink_dish_downlink_throughput_bytes[5m]) * 8 / 1000000',
+    upMbps: 'rate(starlink_dish_uplink_throughput_bytes[5m]) * 8 / 1000000'
   } as const;
-  await Promise.all(
-    (Object.keys(q) as Array<keyof typeof q>).map(async (k) => {
-      metrics.value[k] = await fetchInstantProm(q[k]);
-    })
-  );
-  latencySeries.value = await fetchRangeProm('starlink_latency_ms', 600, 10);
+
+  // Cards
+  const [lat, pl, dMbps, uMbps] = await Promise.all([
+    fetchInstantProm(q.latencyMs),
+    fetchInstantProm(q.packetLossPct),
+    fetchInstantProm(q.downMbps),
+    fetchInstantProm(q.upMbps)
+  ]);
+  metrics.value.latency = lat;
+  metrics.value.packetLoss = pl;
+  metrics.value.bandwidthDown = dMbps;
+  metrics.value.bandwidthUp = uMbps;
+
+  // Charts
+  latencySeries.value = await fetchRangeProm(q.latencyMs, 600, 10);
   const [down, up] = await Promise.all([
-    fetchRangeProm('starlink_bandwidth_down_mbps', 600, 10),
-    fetchRangeProm('starlink_bandwidth_up_mbps', 600, 10)
+    fetchRangeProm(q.downMbps, 600, 10),
+    fetchRangeProm(q.upMbps, 600, 10)
   ]);
   bandwidthDownSeries.value = down;
   bandwidthUpSeries.value = up;
