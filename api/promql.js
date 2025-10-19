@@ -8,26 +8,13 @@ export default async function handler(req, res) {
     const baseUrl = raw.replace(/\/$/, '');
 
     const url = new URL(req.url, 'http://localhost');
+    const endpointParam = (url.searchParams.get('endpoint') || '').toLowerCase();
+    const useSeries = endpointParam === 'series' || url.searchParams.get('series') === '1';
+
     const query = url.searchParams.get('query');
-    const start = url.searchParams.get('start');
-    const end = url.searchParams.get('end');
+    let start = url.searchParams.get('start');
+    let end = url.searchParams.get('end');
     const step = url.searchParams.get('step');
-
-    if (!query) {
-      res.status(400).json({ error: "Missing 'query' parameter" });
-      return;
-    }
-
-    const isRange = Boolean(start && end && step);
-    const endpoint = isRange ? 'query_range' : 'query';
-
-    const params = new URLSearchParams();
-    params.set('query', query);
-    if (isRange) {
-      params.set('start', start);
-      params.set('end', end);
-      params.set('step', step);
-    }
 
     const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
     if (process.env.PROM_BASIC) {
@@ -41,7 +28,35 @@ export default async function handler(req, res) {
 
     // Normalize to include /api/v1 if caller passed base without it
     const apiBase = /\/api\/v1$/.test(baseUrl) ? baseUrl : `${baseUrl.replace(/\/$/, '')}/api/v1`;
-    const upstream = `${apiBase}/${endpoint}?${params.toString()}`;
+
+    let upstream = '';
+    if (useSeries) {
+      // Series endpoint requires start/end. Default to last hour if not provided.
+      const now = Math.floor(Date.now() / 1000);
+      if (!end) end = String(now);
+      if (!start) start = String(now - 3600);
+      const matchExpr = url.searchParams.get('match') || url.searchParams.get('match[]') || '{job="starlink"}';
+      const params = new URLSearchParams();
+      params.append('match[]', matchExpr);
+      params.set('start', start);
+      params.set('end', end);
+      upstream = `${apiBase}/series?${params.toString()}`;
+    } else {
+      if (!query) {
+        res.status(400).json({ error: "Missing 'query' parameter" });
+        return;
+      }
+      const isRange = Boolean(start && end && step);
+      const endpoint = isRange ? 'query_range' : 'query';
+      const params = new URLSearchParams();
+      params.set('query', query);
+      if (isRange) {
+        params.set('start', start);
+        params.set('end', end);
+        params.set('step', step);
+      }
+      upstream = `${apiBase}/${endpoint}?${params.toString()}`;
+    }
 
     const response = await fetch(upstream, { headers });
     const text = await response.text();
