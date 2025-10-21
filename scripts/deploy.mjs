@@ -26,14 +26,12 @@ async function run(cmd) {
     const url = match ? match[0] : null;
     if (url) {
       console.log(`\nDeployed: ${url}\n`);
-      const alias = process.env.VERCEL_ALIAS;
-      if (alias) {
-        try {
-          await run(`npx -y vercel alias set ${url} ${alias}${token}`);
-          console.log(`\nAliased to: https://${alias}\n`);
-        } catch (e) {
-          console.warn('\nAlias failed:', e?.message || e);
-        }
+      const alias = process.env.VERCEL_ALIAS || 'levante-performance-digitalpros-projects.vercel.app';
+      try {
+        await run(`npx -y vercel alias set ${url} ${alias}${token}`);
+        console.log(`\nAliased to: https://${alias}\n`);
+      } catch (e) {
+        console.warn('\nAlias failed:', e?.message || e);
       }
     } else {
       console.log('\nDeployed. (Could not parse deployment URL from output)\n');

@@ -184,6 +184,17 @@ npm run diagnose:starlink
 # → prints a JSON summary of current latency, packet loss, throughput, and issue flags
 ```
 
+Grafana dashboard import/update
+- The advanced Starlink dashboard JSON lives at `deployment/grafana-dashboard-starlink.json`.
+- To import/update it into your Grafana Cloud stack:
+```bash
+# once per machine: save a Grafana API token (Editor/Admin on the stack)
+printf '<your_grafana_api_token>' > secrets/grafana_api_token.txt
+
+# import/update the dashboard (replace with your stack host)
+STACK_HOST=<your-stack>.grafana.net npm run grafana:import
+```
+
 ---
 
 ## Repo layout

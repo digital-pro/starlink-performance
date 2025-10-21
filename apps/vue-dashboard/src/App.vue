@@ -4,8 +4,8 @@
       <h1 style="margin:0; font-size: 24px;">Levante Performance</h1>
       <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap; color:#667;">
         <small>Data Source: Prometheus (Grafana Cloud)</small>
-        <a href="https://levanteperformance.grafana.net/d/ce09662f-cb9a-4531-b88e-e6b165df82fb/starlink-performance?orgId=1&from=now-6h&to=now&timezone=browser&refresh=30s" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #444; background:#222; color:white; border-radius:8px; text-decoration:none;">Open in Grafana</a>
-        <a href="https://levanteperformance.grafana.net/public-dashboards/d379680fc19a44e1868560d5e7fe6671" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #666; background:#444; color:white; border-radius:8px; text-decoration:none;">Public view</a>
+        <a href="https://levanteperformance.grafana.net/d/f0e7a87e-0050-4223-9ac6-ee71140c822c/starlink-performance-advanced?from=now-6h&to=now&timezone=browser&refresh=30s" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #444; background:#222; color:white; border-radius:8px; text-decoration:none;">Open in Grafana</a>
+        <a href="https://levanteperformance.grafana.net/public-dashboards/bf1r1cmlttr7kb" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #666; background:#444; color:white; border-radius:8px; text-decoration:none;">Public view</a>
         <button @click="refreshAll" style="padding:8px 12px; border:1px solid #08c; background:#08c; color:white; border-radius:8px; cursor:pointer;">Refresh</button>
       </div>
     </header>
@@ -21,8 +21,33 @@
     <section style="margin-top: 24px; display:grid; grid-template-columns: 1fr; gap: 16px;">
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">Starlink Diagnostics</h3>
+          <small style="color:#778;">spike / micro-loss / outage / obstruction</small>
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin-top:12px;">
+          <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff;">
+            <div style="font-weight:600; color:#445;">Latency spike</div>
+            <div :style="flagStyle(flags.latencySpike)">{{ flags.latencySpike ? 'YES' : 'no' }}</div>
+          </div>
+          <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff;">
+            <div style="font-weight:600; color:#445;">Micro‑loss</div>
+            <div :style="flagStyle(flags.microLoss)">{{ flags.microLoss ? 'YES' : 'no' }}</div>
+          </div>
+          <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff;">
+            <div style="font-weight:600; color:#445;">Outage active</div>
+            <div :style="flagStyle(flags.outage)">{{ flags.outage ? 'YES' : 'no' }}</div>
+          </div>
+          <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff;">
+            <div style="font-weight:600; color:#445;">Obstruction</div>
+            <div :style="flagStyle(flags.obstruction)">{{ flags.obstruction ? 'YES' : 'no' }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Latency (last 10 min)</h3>
-          <small style="color:#778;">starlink_dish_pop_ping_latency_seconds × 1000</small>
+          <small style="color:#778;">starlink_latency_ms (recording rule)</small>
         </div>
         <v-chart :option="latencyOption" autoresize style="height:260px; margin-top:8px;" />
       </div>
@@ -30,7 +55,7 @@
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Bandwidth (Down / Up)</h3>
-          <small style="color:#778;">rate(starlink_dish_*_throughput_bytes[5m]) × 8 / 1e6</small>
+          <small style="color:#778;">starlink_down_mbps / starlink_up_mbps (recording rules)</small>
         </div>
         <v-chart :option="bandwidthOption" autoresize style="height:260px; margin-top:8px;" />
       </div>
@@ -61,6 +86,13 @@ const metrics = ref<Record<string, number | string>>({
   bandwidthDown: 'N/A',
   bandwidthUp: 'N/A',
   anomalyRate: 'N/A'
+});
+
+const flags = ref<{ latencySpike: boolean; microLoss: boolean; outage: boolean; obstruction: boolean }>({
+  latencySpike: false,
+  microLoss: false,
+  outage: false,
+  obstruction: false
 });
 
 // Desired order: Down (upper-left), Latency (upper-right), Up (lower-left), Packet Loss (lower-right)
@@ -117,12 +149,11 @@ async function fetchRangeProm(query: string, seconds = 600, step = 10): Promise<
 }
 
 async function refreshAll() {
-  // Use actual Starlink exporter metrics
   const q = {
-    latency: 'starlink_dish_pop_ping_latency_seconds * 1000',
-    packetLoss: 'starlink_dish_pop_ping_drop_ratio * 100',
-    bandwidthDown: 'avg_over_time(starlink_dish_downlink_throughput_bytes[1m]) * 8 / 1000000',
-    bandwidthUp: 'avg_over_time(starlink_dish_uplink_throughput_bytes[1m]) * 8 / 1000000'
+    latency: 'starlink_latency_ms',
+    packetLoss: 'starlink_packet_loss_pct',
+    bandwidthDown: 'starlink_down_mbps',
+    bandwidthUp: 'starlink_up_mbps'
   } as const;
 
   const [lat, pl, dMbps, uMbps] = await Promise.all([
@@ -143,6 +174,18 @@ async function refreshAll() {
   ]);
   bandwidthDownSeries.value = down;
   bandwidthUpSeries.value = up;
+
+  // Flags
+  const [spike, microLoss, outage, obstruction] = await Promise.all([
+    fetchInstantProm('starlink_latency_spike'),
+    fetchInstantProm('starlink_micro_loss'),
+    fetchInstantProm('starlink_outage_active'),
+    fetchInstantProm('starlink_obstruction_present')
+  ]);
+  flags.value.latencySpike = spike === 'N/A' ? false : Number(spike) > 0;
+  flags.value.microLoss = microLoss === 'N/A' ? false : Number(microLoss) > 0;
+  flags.value.outage = outage === 'N/A' ? false : Number(outage) > 0;
+  flags.value.obstruction = obstruction === 'N/A' ? false : Number(obstruction) > 0;
 }
 
 const latencySeries = ref<Array<[number, number]>>([]);
@@ -170,6 +213,19 @@ const bandwidthOption = computed(() => ({
     { type: 'line', name: 'Up', data: bandwidthUpSeries.value, showSymbol: false, smooth: true }
   ]
 }));
+
+function flagStyle(active: boolean) {
+  return {
+    marginTop: '8px',
+    display: 'inline-block',
+    padding: '6px 10px',
+    borderRadius: '8px',
+    fontWeight: 600,
+    color: active ? '#b30000' : '#0a7',
+    background: active ? '#ffe6e6' : '#e7fff5',
+    border: `1px solid ${active ? '#f5b5b5' : '#b7f0db'}`
+  } as const;
+}
 
 onMounted(() => {
   refreshAll();

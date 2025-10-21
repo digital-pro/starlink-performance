@@ -1,0 +1,94 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "title": "Starlink Performance (Advanced)",
+  "editable": true,
+  "timezone": "browser",
+  "schemaVersion": 37,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Latency (ms)",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "starlink_latency_ms" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value" }
+    },
+    {
+      "type": "stat",
+      "title": "Packet Loss (%)",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "starlink_packet_loss_pct" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value" }
+    },
+    {
+      "type": "stat",
+      "title": "Down (Mbps)",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "starlink_down_mbps" }]
+    },
+    {
+      "type": "stat",
+      "title": "Up (Mbps)",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "starlink_up_mbps" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency (15m)",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "targets": [{ "expr": "starlink_latency_ms" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Bandwidth (Down/Up)",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "starlink_down_mbps", "legendFormat": "Down" },
+        { "expr": "starlink_up_mbps", "legendFormat": "Up" }
+      ]
+    },
+    {
+      "type": "state-timeline",
+      "title": "Diagnostic Flags",
+      "gridPos": { "x": 0, "y": 12, "w": 24, "h": 6 },
+      "targets": [
+        { "expr": "starlink_latency_spike", "legendFormat": "Latency spike" },
+        { "expr": "starlink_micro_loss", "legendFormat": "Micro-loss" },
+        { "expr": "starlink_outage_active", "legendFormat": "Outage" },
+        { "expr": "starlink_obstruction_present", "legendFormat": "Obstruction" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Overlay: Latency vs Node CPU Load",
+      "gridPos": { "x": 0, "y": 18, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "starlink_latency_ms", "legendFormat": "Starlink latency (ms)" },
+        { "expr": "100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[2m])))", "legendFormat": "Node CPU util %" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Overlay: Latency vs Node Net Drops",
+      "gridPos": { "x": 12, "y": 18, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "starlink_latency_ms", "legendFormat": "Starlink latency (ms)" },
+        { "expr": "sum by (instance) (rate(node_network_receive_drop_total[2m]) + rate(node_network_transmit_drop_total[2m]))", "legendFormat": "Node drops/s" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Node Resources (CPU/Mem/Disk)",
+      "gridPos": { "x": 0, "y": 26, "w": 24, "h": 8 },
+      "targets": [
+        { "expr": "100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])))", "legendFormat": "CPU %" },
+        { "expr": "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))", "legendFormat": "Mem % used" },
+        { "expr": "sum by (instance) (rate(node_disk_io_time_seconds_total[5m]))", "legendFormat": "Disk IO time/s" }
+      ]
+    }
+  ]
+}
+
+
