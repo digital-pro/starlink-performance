@@ -11,5 +11,7 @@ secrets/
 logs/
 # local prom TSDB data
 data/
+# legacy helper cache (now migrated to logs/)
+deployment/.cache/
 # local deployment files
 deployment/remote-write.*.yml
