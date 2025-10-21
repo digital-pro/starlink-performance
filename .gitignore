@@ -15,3 +15,4 @@ data/
 deployment/.cache/
 # local deployment files
 deployment/remote-write.*.yml
+deployment/prom-wsl.yml
