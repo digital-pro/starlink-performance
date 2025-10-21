@@ -9,5 +9,7 @@ apps/*/dist/
 secrets/
 # local logs (Prometheus helper, exporter, script outputs)
 logs/
+# local prom TSDB data
+data/
 # local deployment files
 deployment/remote-write.*.yml
