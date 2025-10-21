@@ -1,0 +1,17 @@
+{
+	"ulid": "01K824FG4SPPTYHXW4KXWYN251",
+	"minTime": 1760997600000,
+	"maxTime": 1761004800000,
+	"stats": {
+		"numSamples": 530,
+		"numSeries": 10,
+		"numChunks": 10
+	},
+	"compaction": {
+		"level": 1,
+		"sources": [
+			"01K824FG4SPPTYHXW4KXWYN251"
+		]
+	},
+	"version": 1
+}
