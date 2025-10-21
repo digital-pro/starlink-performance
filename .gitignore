@@ -7,5 +7,7 @@ public/
 apps/*/dist/
 .vercel
 secrets/
+# local logs (Prometheus helper, exporter, script outputs)
+logs/
 # local deployment files
 deployment/remote-write.*.yml

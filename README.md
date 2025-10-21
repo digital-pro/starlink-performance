@@ -192,3 +192,63 @@ deployment/               # Remote write helpers for Prometheus → Grafana Clou
 ## License
 
 MIT (c) Levante Framework
+
+---
+
+## Operations & quick commands
+
+These npm scripts help run and verify the full pipeline (Exporter → Prometheus → Grafana Cloud → Dashboard):
+
+- Start Prometheus (WSL helper)
+  - Requires: `INSTANCE_ID` env var (your Grafana Cloud stack instance ID)
+  - Optional: `STARLINK_TARGET` like `10.0.0.5:9817` (defaults to `127.0.0.1:9817`)
+
+```bash
+INSTANCE_ID=2743807 npm run prom:start
+```
+
+- Stop Prometheus started by the helper
+```bash
+npm run prom:stop
+```
+
+- Tail Prometheus logs
+```bash
+npm run prom:logs
+```
+
+- Check Prometheus scrape targets
+```bash
+npm run prom:targets | jq .   # optional jq
+```
+
+- Check Starlink exporter endpoint
+```bash
+npm run exporter:check
+# or with a remote host
+STARLINK_TARGET=10.0.0.5:9817 npm run exporter:check
+```
+
+- Verify dashboard read-path (Vercel → Grafana Cloud)
+  - Set `VERCEL_ALIAS` to your deployed hostname (e.g., `levante-performance.vercel.app` or your custom alias)
+```bash
+VERCEL_ALIAS=levante-performance.vercel.app npm run read:up | head -n1
+VERCEL_ALIAS=levante-performance.vercel.app npm run read:series | head -n1
+```
+
+- Auto-discover exporter and wire automatically (optional)
+```bash
+npm run ops:find-target   # scans local subnets for a starlink exporter on :9817
+npm run ops:auto-wire     # finds, persists target, restarts Prometheus, verifies
+```
+
+Notes
+- The helper uses `deployment/run-wsl-prom.sh`, which reads your write token from `secrets/grafana_write_token.txt` and writes config to `deployment/prom-wsl.yml`.
+- Health endpoint: `GET /api/ping` now returns `{ ok: true, now: ... }` for quick checks.
+- If your exporter isn’t on localhost, pass `STARLINK_TARGET` or update your Prometheus config accordingly.
+ - Logs are written to `logs/` (gitignored). Use `npm run prom:logs` to tail Prometheus.
+
+Troubleshooting (recap)
+- Empty panels or no data in Grafana Cloud usually means the exporter target is Down. Start the exporter or point Prometheus at the correct host.
+- 404 on remote_write: ensure the write URL is `/api/prom/push` (see `deployment/prometheus-remote-write.yml`).
+- Auth errors: use a Grafana Cloud Access Policy token with `metrics:read` (reads) and `metrics:write` (writes).

@@ -9,7 +9,22 @@
     "build": "npm run build -w @levante/vue-dashboard && node scripts/prepare-public.mjs",
     "preview": "npx http-server public -p 5175 -c-1",
     "dev:vue": "npm run dev -w @levante/vue-dashboard",
-    "deploy": "node scripts/deploy.mjs"
+    "deploy": "node scripts/deploy.mjs",
+    "prom:start": "bash /home/djc/levante/levante-performance/deployment/run-wsl-prom.sh --instance ${INSTANCE_ID} --starlink ${STARLINK_TARGET:-127.0.0.1:9817} --bg",
+    "prom:stop": "pkill -f '/home/djc/levante/levante-performance/logs/prometheus/prometheus' || true",
+    "prom:logs": "tail -n 200 /home/djc/levante/levante-performance/logs/prometheus.out || true",
+    "prom:targets": "curl -fsS http://127.0.0.1:9090/api/v1/targets || true",
+    "exporter:check": "curl -fsS http://${STARLINK_TARGET:-127.0.0.1:9817}/metrics | head || true",
+    "read:up": "test -n \"$VERCEL_ALIAS\" && curl -sS https://$VERCEL_ALIAS/api/promql?query=up || echo 'Set VERCEL_ALIAS to your deployed domain'",
+    "read:series": "test -n \"$VERCEL_ALIAS\" && curl -sS \"https://$VERCEL_ALIAS/api/promql?endpoint=series&match[]=starlink_*\" || echo 'Set VERCEL_ALIAS to your deployed domain'",
+    "ops:restart": "node scripts/ops-restart.mjs",
+    "ops:set-target": "bash scripts/ops-set-target.sh",
+    "ops:find-target": "bash scripts/find-starlink-exporter.sh || echo 'Not found'",
+    "ops:auto-wire": "TARGET=$(bash scripts/find-starlink-exporter.sh 2>/dev/null || true); if [ -n \"$TARGET\" ]; then echo Found $TARGET; bash scripts/ops-set-target.sh $TARGET; node scripts/ops-restart.mjs; else echo 'Exporter not found on common subnets'; fi",
+    "exporter:mock:start": "node scripts/exporter-mock.js",
+    "exporter:mock:start:bg": "mkdir -p logs && nohup node scripts/exporter-mock.js > logs/exporter-mock.out 2>&1 & echo $! > logs/exporter-mock.pid && echo started",
+    "exporter:mock:stop": "test -f logs/exporter-mock.pid && kill $(cat logs/exporter-mock.pid) || true",
+    "dev:stack": "npm run exporter:mock:start:bg && npm run ops:set-target -- 127.0.0.1:9817 && npm run ops:restart && npm run prom:targets"
   },
   "devDependencies": {
     "http-server": "^14.1.1",
