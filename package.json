@@ -28,7 +28,8 @@
     "exporter:mock:start": "node scripts/exporter-mock.js",
     "exporter:mock:start:bg": "mkdir -p logs && nohup node scripts/exporter-mock.js > logs/exporter-mock.out 2>&1 & echo $! > logs/exporter-mock.pid && echo started",
     "exporter:mock:stop": "test -f logs/exporter-mock.pid && kill $(cat logs/exporter-mock.pid) || true",
-    "dev:stack": "npm run exporter:mock:start:bg && npm run ops:set-target -- 127.0.0.1:9817 && npm run ops:restart && npm run prom:targets"
+    "dev:stack": "npm run exporter:mock:start:bg && npm run ops:set-target -- 127.0.0.1:9817 && npm run ops:restart && npm run prom:targets",
+    "diagnose:starlink": "node scripts/diagnose-starlink.mjs"
   },
   "devDependencies": {
     "http-server": "^14.1.1",
