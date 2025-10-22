@@ -1,0 +1,42 @@
+groups:
+  - name: starlink.kpis
+    interval: 15s
+    rules:
+      # Baseline KPIs
+      - record: starlink_latency_ms
+        expr: starlink_dish_pop_ping_latency_seconds * 1000
+
+      - record: starlink_packet_loss_pct
+        expr: starlink_dish_pop_ping_drop_ratio * 100
+
+      - record: starlink_down_mbps
+        expr: avg_over_time(starlink_dish_downlink_throughput_bytes[1m]) * 8 / 1e6
+
+      - record: starlink_up_mbps
+        expr: avg_over_time(starlink_dish_uplink_throughput_bytes[1m]) * 8 / 1e6
+
+      # 15-second reconfiguration spikes detector
+      - record: starlink_latency_spike
+        expr: rate(starlink_dish_pop_ping_latency_seconds[30s]) > (avg_over_time(starlink_dish_pop_ping_latency_seconds[5m]) * 1.5)
+
+      # Micro-loss sustained (1–2% typical)
+      - record: starlink_micro_loss
+        expr: avg_over_time(starlink_dish_pop_ping_drop_ratio[2m]) * 100 > 1.5
+
+      # Outage presence
+      - record: starlink_outage_active
+        expr: rate(starlink_dish_outage_duration[1m]) > 0
+
+      # Obstruction (higher wedge obstruction ratios indicate physical blockage)
+      - record: starlink_obstruction_present
+        expr: max_over_time(starlink_dish_wedge_abs_fraction_obstruction_ratio[5m]) > 0.2
+
+      # Correlate app latency (placeholder metrics) vs starlink conditions
+      - record: app_p95_latency_during_starlink_spike
+        expr: (histogram_quantile(0.95, sum(rate(app_request_duration_seconds_bucket[2m])) by (le)) or on() vector(0))
+              and on() (starlink_latency_spike)
+
+      - record: app_error_rate_during_starlink_loss
+        expr: (rate(app_request_errors_total[2m]) or on() vector(0))
+              and on() (starlink_micro_loss)
+

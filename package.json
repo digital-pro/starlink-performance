@@ -21,10 +21,17 @@
     "ops:set-target": "bash scripts/ops-set-target.sh",
     "ops:find-target": "bash scripts/find-starlink-exporter.sh || echo 'Not found'",
     "ops:auto-wire": "TARGET=$(bash scripts/find-starlink-exporter.sh 2>/dev/null || true); if [ -n \"$TARGET\" ]; then echo Found $TARGET; bash scripts/ops-set-target.sh $TARGET; node scripts/ops-restart.mjs; else echo 'Exporter not found on common subnets'; fi",
+    "restart:exporter": "test -f logs/starlink_exporter.pid && kill $(cat logs/starlink_exporter.pid) || true; cd /home/djc/starlink_exporter && go build -o /home/djc/levante/levante-performance/logs/starlink_exporter ./cmd/starlink_exporter && nohup /home/djc/levante/levante-performance/logs/starlink_exporter -port 9817 > /home/djc/levante/levante-performance/logs/starlink_exporter.out 2>&1 & echo $! > /home/djc/levante/levante-performance/logs/starlink_exporter.pid && echo started",
+    "restart:stack": "npm run restart:exporter && npm run ops:restart",
+    "watchdog:start": "mkdir -p logs && nohup node scripts/watchdog.mjs > logs/watchdog.out 2>&1 & echo $! > logs/watchdog.pid && echo started",
+    "watchdog:stop": "test -f logs/watchdog.pid && kill $(cat logs/watchdog.pid) || true",
     "exporter:mock:start": "node scripts/exporter-mock.js",
     "exporter:mock:start:bg": "mkdir -p logs && nohup node scripts/exporter-mock.js > logs/exporter-mock.out 2>&1 & echo $! > logs/exporter-mock.pid && echo started",
     "exporter:mock:stop": "test -f logs/exporter-mock.pid && kill $(cat logs/exporter-mock.pid) || true",
-    "dev:stack": "npm run exporter:mock:start:bg && npm run ops:set-target -- 127.0.0.1:9817 && npm run ops:restart && npm run prom:targets"
+    "dev:stack": "npm run exporter:mock:start:bg && npm run ops:set-target -- 127.0.0.1:9817 && npm run ops:restart && npm run prom:targets",
+    "diagnose:starlink": "node scripts/diagnose-starlink.mjs",
+    "grafana:import": "node scripts/import-grafana-dashboard.mjs",
+    "grafana:public": "node scripts/grafana-public.mjs"
   },
   "devDependencies": {
     "http-server": "^14.1.1",

@@ -173,6 +173,28 @@ Secrets convenience (gitignored):
 - CDN/browser cache:
   - Hard refresh, use an incognito window, or append a cache-busting query string to the site URL.
 
+Advanced metrics & diagnostics
+- Recording rules (loaded by helper): `deployment/rules/starlink-kpis.yml`
+  - `starlink_latency_ms`, `starlink_packet_loss_pct`, `starlink_down_mbps`, `starlink_up_mbps`
+  - `starlink_latency_spike` (15s reconfiguration spikes), `starlink_micro_loss`, `starlink_outage_active`, `starlink_obstruction_present`
+- Node exporter (optional): pass `--node <HOST:9100>` to `deployment/run-wsl-prom.sh` or set target in script; default is `127.0.0.1:9100`.
+- Local diagnose utility:
+```bash
+npm run diagnose:starlink
+# → prints a JSON summary of current latency, packet loss, throughput, and issue flags
+```
+
+Grafana dashboard import/update
+- The advanced Starlink dashboard JSON lives at `deployment/grafana-dashboard-starlink.json`.
+- To import/update it into your Grafana Cloud stack:
+```bash
+# once per machine: save a Grafana API token (Editor/Admin on the stack)
+printf '<your_grafana_api_token>' > secrets/grafana_api_token.txt
+
+# import/update the dashboard (replace with your stack host)
+STACK_HOST=<your-stack>.grafana.net npm run grafana:import
+```
+
 ---
 
 ## Repo layout
@@ -242,11 +264,30 @@ npm run ops:find-target   # scans local subnets for a starlink exporter on :9817
 npm run ops:auto-wire     # finds, persists target, restarts Prometheus, verifies
 ```
 
+- Auto-restart watchdog (optional but recommended)
+  - Restarts the exporter and/or Prometheus automatically if either becomes unhealthy.
+  - Writes logs to `logs/watchdog.out`; PID at `logs/watchdog.pid`.
+```bash
+npm run watchdog:start
+npm run watchdog:stop
+```
+
+- Manual restarts
+```bash
+# Restart only the Starlink exporter
+npm run restart:exporter
+
+# Restart exporter and Prometheus stack
+npm run restart:stack
+```
+
 Notes
 - The helper uses `deployment/run-wsl-prom.sh`, which reads your write token from `secrets/grafana_write_token.txt` and writes config to `deployment/prom-wsl.yml`.
 - Health endpoint: `GET /api/ping` now returns `{ ok: true, now: ... }` for quick checks.
 - If your exporter isn’t on localhost, pass `STARLINK_TARGET` or update your Prometheus config accordingly.
  - Logs are written to `logs/` (gitignored). Use `npm run prom:logs` to tail Prometheus.
+ - Prometheus TSDB data lives in `data/` (gitignored).
+ - Legacy `deployment/.cache/` is no longer used and is gitignored.
 
 Troubleshooting (recap)
 - Empty panels or no data in Grafana Cloud usually means the exporter target is Down. Start the exporter or point Prometheus at the correct host.

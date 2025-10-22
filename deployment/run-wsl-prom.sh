@@ -17,6 +17,7 @@ CONF="$ROOT_DIR/deployment/prom-wsl.yml"
 BG=false
 STARLINK="127.0.0.1:9817"
 NETDATA="127.0.0.1:19999"
+NODE="127.0.0.1:9100"
 INSTANCE=""
 
 while [[ $# -gt 0 ]]; do
@@ -24,6 +25,7 @@ while [[ $# -gt 0 ]]; do
     --instance) INSTANCE="$2"; shift 2;;
     --starlink) STARLINK="$2"; shift 2;;
     --netdata) NETDATA="$2"; shift 2;;
+    --node) NODE="$2"; shift 2;;
     --bg) BG=true; shift;;
     *) echo "Unknown arg: $1" >&2; exit 1;;
   esac
@@ -78,9 +80,15 @@ cat > "$CONF" <<YAML
 global:
   scrape_interval: 15s
 
+rule_files:
+  - ${ROOT_DIR}/deployment/rules/*.yml
+
 scrape_configs:
   - job_name: starlink
     static_configs: [{ targets: ['${STARLINK}'] }]
+
+  - job_name: node
+    static_configs: [{ targets: ['${NODE}'] }]
 
 remote_write:
   - url: https://prometheus-prod-36-prod-us-west-0.grafana.net/api/prom/push

@@ -1,0 +1,171 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "title": "Starlink Performance (Advanced)",
+  "editable": true,
+  "timezone": "browser",
+  "schemaVersion": 37,
+  "version": 2,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Latency (ms)",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "starlink_latency_ms" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value" },
+      "description": "Latest Starlink ping latency (ms)."
+    },
+    {
+      "type": "stat",
+      "title": "Packet Loss (%)",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "starlink_packet_loss_pct" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value" },
+      "description": "Instantaneous packet loss ratio converted to percent."
+    },
+    {
+      "type": "stat",
+      "title": "Down (Mbps)",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "starlink_down_mbps" }],
+      "description": "Average downlink throughput over 1m, converted to Mbps."
+    },
+    {
+      "type": "stat",
+      "title": "Up (Mbps)",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "targets": [{ "expr": "starlink_up_mbps" }],
+      "description": "Average uplink throughput over 1m, converted to Mbps."
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency (15m)",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "targets": [{ "expr": "starlink_latency_ms" }],
+      "description": "Starlink latency over time. Look for ~15s periodic spikes (reconfiguration).",
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "options": { "legend": { "showLegend": true } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Bandwidth (Down/Up) + Micro-loss",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "starlink_down_mbps", "legendFormat": "Down (Mbps)" },
+        { "expr": "starlink_up_mbps", "legendFormat": "Up (Mbps)" },
+        { "expr": "starlink_micro_loss * 100", "legendFormat": "Micro-loss (%)" }
+      ],
+      "description": "Down/Up Mbps (left axis) with micro-loss % (right axis) to reveal loss during bursts.",
+      "fieldConfig": {
+        "defaults": { "unit": "Mbps" },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Micro-loss (%)" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.axisPlacement", "value": "right" }
+            ]
+          }
+        ]
+      },
+      "options": { "legend": { "showLegend": true } }
+    },
+    {
+      "type": "state-timeline",
+      "title": "Diagnostic Flags",
+      "gridPos": { "x": 0, "y": 12, "w": 24, "h": 6 },
+      "targets": [
+        { "expr": "starlink_latency_spike", "legendFormat": "Latency spike" },
+        { "expr": "starlink_micro_loss", "legendFormat": "Micro-loss (bool)" },
+        { "expr": "starlink_outage_active", "legendFormat": "Outage" },
+        { "expr": "starlink_obstruction_present", "legendFormat": "Obstruction" }
+      ],
+      "description": "Boolean flags derived from recording rules to highlight problematic periods."
+    },
+    {
+      "type": "timeseries",
+      "title": "Overlay: Latency vs Node CPU Load",
+      "gridPos": { "x": 0, "y": 18, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "starlink_latency_ms", "legendFormat": "Starlink latency (ms)" },
+        { "expr": "100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[2m])))", "legendFormat": "Node CPU util %" }
+      ],
+      "description": "Correlate Starlink latency with host CPU. CPU plotted on right axis.",
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Node CPU util %" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.axisPlacement", "value": "right" }
+            ]
+          }
+        ]
+      },
+      "options": { "legend": { "showLegend": true } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Overlay: Latency vs Node Net Drops",
+      "gridPos": { "x": 12, "y": 18, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "starlink_latency_ms", "legendFormat": "Starlink latency (ms)" },
+        { "expr": "sum by (instance) (rate(node_network_receive_drop_total[2m]) + rate(node_network_transmit_drop_total[2m]))", "legendFormat": "Node drops/s" }
+      ],
+      "description": "Correlate latency with NIC drops. Drops plotted on right axis.",
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Node drops/s" },
+            "properties": [
+              { "id": "unit", "value": "ops" },
+              { "id": "custom.axisPlacement", "value": "right" }
+            ]
+          }
+        ]
+      },
+      "options": { "legend": { "showLegend": true } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Node Resources (CPU/Mem/Disk)",
+      "gridPos": { "x": 0, "y": 26, "w": 24, "h": 8 },
+      "targets": [
+        { "expr": "100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])))", "legendFormat": "CPU %" },
+        { "expr": "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))", "legendFormat": "Mem % used" },
+        { "expr": "sum by (instance) (rate(node_disk_io_time_seconds_total[5m]))", "legendFormat": "Disk IO time/s" }
+      ],
+      "description": "Host resource overview to rule out local bottlenecks.",
+      "fieldConfig": {
+        "defaults": { "unit": "percent" },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Disk IO time/s" },
+            "properties": [ { "id": "unit", "value": "s" } ]
+          }
+        ]
+      },
+      "options": { "legend": { "showLegend": true } }
+    },
+    {
+      "type": "heatmap",
+      "title": "Latency Heatmap (ms)",
+      "gridPos": { "x": 0, "y": 34, "w": 12, "h": 8 },
+      "targets": [ { "expr": "starlink_latency_ms" } ],
+      "options": { "legend": { "show": true } },
+      "description": "Distribution of latency to reveal periodic spikes."
+    },
+    {
+      "type": "bargauge",
+      "title": "Outage cause breakdown",
+      "gridPos": { "x": 12, "y": 34, "w": 12, "h": 8 },
+      "targets": [ { "expr": "sum by (cause) (rate(starlink_dish_outage_duration[5m]))" } ],
+      "description": "Relative contribution by outage cause label over the last 5m."
+    }
+  ]
+}
+
+
