@@ -4,7 +4,7 @@
       <h1 style="margin:0; font-size: 24px;">Levante Performance</h1>
       <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap; color:#667;">
         <small>Data Source: Prometheus (Grafana Cloud)</small>
-        <a href="https://levanteperformance.grafana.net/d/2cce082a-6360-4f2c-b687-9d3f937e8270/starlink-performance-advanced?from=now-6h&to=now&timezone=browser&refresh=30s" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #444; background:#222; color:white; border-radius:8px; text-decoration:none;">Open in Grafana</a>
+        <a href="https://levanteperformance.grafana.net/d/eeb52d4b-07c7-4496-95cd-f06bd12aa41e/starlink-performance-advanced?from=now-6h&to=now&timezone=browser&refresh=30s" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #444; background:#222; color:white; border-radius:8px; text-decoration:none;">Open in Grafana</a>
         <a href="https://levanteperformance.grafana.net/public-dashboards/bf1r1cmlttr7kb" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #666; background:#444; color:white; border-radius:8px; text-decoration:none;">Public view</a>
         <button @click="refreshAll" style="padding:8px 12px; border:1px solid #08c; background:#08c; color:white; border-radius:8px; cursor:pointer;">Refresh</button>
       </div>
@@ -194,6 +194,7 @@ async function refreshAll() {
 const latencySeries = ref<Array<[number, number]>>([]);
 const bandwidthDownSeries = ref<Array<[number, number]>>([]);
 const bandwidthUpSeries = ref<Array<[number, number]>>([]);
+const microLossSeries = ref<Array<[number, number]>>([]);
 
 const latencyOption = computed(() => ({
   tooltip: { trigger: 'axis' },
@@ -209,12 +210,14 @@ const bandwidthOption = computed(() => ({
   tooltip: { trigger: 'axis' },
   grid: { left: 40, right: 16, top: 24, bottom: 40 },
   xAxis: { type: 'time' },
-  yAxis: { type: 'value', name: 'Mbps' },
-  legend: { data: ['Down', 'Up', 'Micro-loss (%)'] },
+  yAxis: [
+    { type: 'value', name: 'Mbps' },
+    { type: 'value', name: '%', position: 'right' }
+  ],
+  legend: { data: ['Down (Mbps)', 'Up (Mbps)', 'Micro-loss (%)'] },
   series: [
-    { type: 'line', name: 'Down', data: bandwidthDownSeries.value, showSymbol: false, smooth: true },
-    { type: 'line', name: 'Up', data: bandwidthUpSeries.value, showSymbol: false, smooth: true },
-    // Micro-loss as a reference line (scales percentage); fetch plotted inline
+    { type: 'line', name: 'Down (Mbps)', data: bandwidthDownSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0 },
+    { type: 'line', name: 'Up (Mbps)', data: bandwidthUpSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0 },
     { type: 'line', name: 'Micro-loss (%)', data: microLossSeries.value, showSymbol: false, yAxisIndex: 1, lineStyle: { type: 'dashed' } }
   ]
 }));
@@ -235,7 +238,6 @@ function flagStyle(active: boolean) {
 onMounted(() => {
   refreshAll();
 });
-
 </script>
 
 <script lang="ts">
