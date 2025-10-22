@@ -4,7 +4,7 @@
       <h1 style="margin:0; font-size: 24px;">Levante Performance</h1>
       <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap; color:#667;">
         <small>Data Source: Prometheus (Grafana Cloud)</small>
-        <a href="https://levanteperformance.grafana.net/d/f0e7a87e-0050-4223-9ac6-ee71140c822c/starlink-performance-advanced?from=now-6h&to=now&timezone=browser&refresh=30s" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #444; background:#222; color:white; border-radius:8px; text-decoration:none;">Open in Grafana</a>
+        <a href="https://levanteperformance.grafana.net/d/2cce082a-6360-4f2c-b687-9d3f937e8270/starlink-performance-advanced?from=now-6h&to=now&timezone=browser&refresh=30s" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #444; background:#222; color:white; border-radius:8px; text-decoration:none;">Open in Grafana</a>
         <a href="https://levanteperformance.grafana.net/public-dashboards/bf1r1cmlttr7kb" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #666; background:#444; color:white; border-radius:8px; text-decoration:none;">Public view</a>
         <button @click="refreshAll" style="padding:8px 12px; border:1px solid #08c; background:#08c; color:white; border-radius:8px; cursor:pointer;">Refresh</button>
       </div>
@@ -49,7 +49,7 @@
           <h3 style="margin:0;">Latency (last 10 min)</h3>
           <small style="color:#778;">starlink_latency_ms (recording rule)</small>
         </div>
-        <v-chart :option="latencyOption" autoresize style="height:260px; margin-top:8px;" />
+        <v-chart :option="latencyOption" autoresize style="height:130px; margin-top:8px;" />
       </div>
 
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
@@ -57,7 +57,7 @@
           <h3 style="margin:0;">Bandwidth (Down / Up)</h3>
           <small style="color:#778;">starlink_down_mbps / starlink_up_mbps (recording rules)</small>
         </div>
-        <v-chart :option="bandwidthOption" autoresize style="height:260px; margin-top:8px;" />
+        <v-chart :option="bandwidthOption" autoresize style="height:130px; margin-top:8px;" />
       </div>
     </section>
 
@@ -132,9 +132,9 @@ async function fetchInstantProm(query: string): Promise<number | 'N/A'> {
   }
 }
 
-async function fetchRangeProm(query: string, seconds = 600, step = 10): Promise<Array<[number, number]>> {
+async function fetchRangeProm(query: string, seconds = 600, step = 10, fixedEnd?: number): Promise<Array<[number, number]>> {
   try {
-    const end = Math.floor(Date.now() / 1000);
+    const end = typeof fixedEnd === 'number' ? fixedEnd : Math.floor(Date.now() / 1000);
     const start = end - seconds;
     const res = await axios.get(`/api/promql`, { params: { query, start, end, step } });
     const result = res.data?.data?.result;
@@ -167,13 +167,16 @@ async function refreshAll() {
   metrics.value.bandwidthDown = dMbps;
   metrics.value.bandwidthUp = uMbps;
 
-  latencySeries.value = await fetchRangeProm(q.latency, 600, 10);
-  const [down, up] = await Promise.all([
-    fetchRangeProm(q.bandwidthDown, 600, 10),
-    fetchRangeProm(q.bandwidthUp, 600, 10)
+  const fixedEnd = Math.floor(Date.now() / 1000);
+  latencySeries.value = await fetchRangeProm(q.latency, 600, 10, fixedEnd);
+  const [down, up, ml] = await Promise.all([
+    fetchRangeProm(q.bandwidthDown, 600, 10, fixedEnd),
+    fetchRangeProm(q.bandwidthUp, 600, 10, fixedEnd),
+    fetchRangeProm('starlink_micro_loss * 100', 600, 10, fixedEnd)
   ]);
   bandwidthDownSeries.value = down;
   bandwidthUpSeries.value = up;
+  microLossSeries.value = ml;
 
   // Flags
   const [spike, microLoss, outage, obstruction] = await Promise.all([
@@ -207,10 +210,12 @@ const bandwidthOption = computed(() => ({
   grid: { left: 40, right: 16, top: 24, bottom: 40 },
   xAxis: { type: 'time' },
   yAxis: { type: 'value', name: 'Mbps' },
-  legend: { data: ['Down', 'Up'] },
+  legend: { data: ['Down', 'Up', 'Micro-loss (%)'] },
   series: [
     { type: 'line', name: 'Down', data: bandwidthDownSeries.value, showSymbol: false, smooth: true },
-    { type: 'line', name: 'Up', data: bandwidthUpSeries.value, showSymbol: false, smooth: true }
+    { type: 'line', name: 'Up', data: bandwidthUpSeries.value, showSymbol: false, smooth: true },
+    // Micro-loss as a reference line (scales percentage); fetch plotted inline
+    { type: 'line', name: 'Micro-loss (%)', data: microLossSeries.value, showSymbol: false, yAxisIndex: 1, lineStyle: { type: 'dashed' } }
   ]
 }));
 

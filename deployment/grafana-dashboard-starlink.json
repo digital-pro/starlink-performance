@@ -87,6 +87,23 @@
         { "expr": "100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))", "legendFormat": "Mem % used" },
         { "expr": "sum by (instance) (rate(node_disk_io_time_seconds_total[5m]))", "legendFormat": "Disk IO time/s" }
       ]
+    },
+    {
+      "type": "heatmap",
+      "title": "Latency Heatmap (ms)",
+      "gridPos": { "x": 0, "y": 34, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "starlink_latency_ms" }
+      ],
+      "options": { "legend": { "show": true } }
+    },
+    {
+      "type": "bargauge",
+      "title": "Outage cause breakdown",
+      "gridPos": { "x": 12, "y": 34, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "sum by (cause) (rate(starlink_dish_outage_duration[5m]))" }
+      ]
     }
   ]
 }
