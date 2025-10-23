@@ -14,8 +14,14 @@
     { "source": "/(.*)", "destination": "/public/vue/$1" }
   ],
   "headers": [
-    { "source": "/", "headers": [{ "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }] },
-    { "source": "/(.*)\\.html", "headers": [{ "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }] },
+    { "source": "/", "headers": [
+      { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
+      { "key": "Content-Security-Policy", "value": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https:" }
+    ] },
+    { "source": "/(.*)\\.html", "headers": [
+      { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
+      { "key": "Content-Security-Policy", "value": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https:" }
+    ] },
     { "source": "/public/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }] }
   ]
 }

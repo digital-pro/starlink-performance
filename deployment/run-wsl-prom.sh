@@ -95,6 +95,16 @@ remote_write:
     basic_auth:
       username: ${INSTANCE}
       password: ${TOKEN}
+    queue_config:
+      # Larger buffers and parallelism to survive upstream blips without dropping
+      capacity: 20000
+      min_shards: 1
+      max_shards: 8
+      max_samples_per_send: 5000
+      batch_send_deadline: 10s
+      retry_on_http_429: true
+      min_backoff: 1s
+      max_backoff: 1m
 YAML
 
 echo "Config written: $CONF"

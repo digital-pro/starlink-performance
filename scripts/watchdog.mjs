@@ -50,6 +50,22 @@ async function isPrometheusUp() {
   return t.ok;
 }
 
+async function exporterFreshnessOk() {
+  // If exporter /metrics lacks updates for >60s, consider stale
+  const r = await httpGet('http://127.0.0.1:9090/api/v1/query?query=timestamp(starlink_latency_ms)', 1500);
+  try {
+    if (!r.ok) return true; // don't flap on prom errors
+    const body = JSON.parse(r.text || '{}');
+    const ts = body?.data?.result?.[0]?.value?.[1];
+    const tNum = Number(ts);
+    if (!Number.isFinite(tNum)) return true;
+    const ageSec = Math.max(0, Date.now() / 1000 - tNum);
+    return ageSec < 90;
+  } catch {
+    return true;
+  }
+}
+
 async function startExporter() {
   // Try existing binary first; build if missing
   const bin = '/home/djc/levante/levante-performance/logs/starlink_exporter';
@@ -68,16 +84,19 @@ async function restartProm() {
   const starlinkTarget = await getStarlinkTarget();
   let exporterFail = 0;
   let promFail = 0;
+  let staleFail = 0;
   const intervalMs = 10000; // 10s checks
   for (;;) {
     try {
-      const [eUp, pUp] = await Promise.all([
+      const [eUp, pUp, fresh] = await Promise.all([
         isExporterUp(starlinkTarget),
-        isPrometheusUp()
+        isPrometheusUp(),
+        exporterFreshnessOk()
       ]);
 
       if (!eUp) exporterFail++; else exporterFail = 0;
       if (!pUp) promFail++; else promFail = 0;
+      if (!fresh) staleFail++; else staleFail = 0;
 
       if (exporterFail >= 2) {
         console.log(`[watchdog] Exporter down. Restarting exporter...`);
@@ -91,6 +110,13 @@ async function restartProm() {
         promFail = 0;
         await restartProm();
         await sleep(2000);
+      }
+
+      if (staleFail >= 6) { // ~1 minute stale
+        console.log(`[watchdog] Exporter metrics stale. Restarting exporter...`);
+        staleFail = 0;
+        await startExporter();
+        await sleep(1500);
       }
     } catch (err) {
       console.error('[watchdog] error:', err && err.message ? err.message : err);

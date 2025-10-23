@@ -5,7 +5,7 @@
   "editable": true,
   "timezone": "browser",
   "schemaVersion": 37,
-  "version": 2,
+  "version": 3,
   "refresh": "30s",
   "panels": [
     {
@@ -164,6 +164,15 @@
       "gridPos": { "x": 12, "y": 34, "w": 12, "h": 8 },
       "targets": [ { "expr": "sum by (cause) (rate(starlink_dish_outage_duration[5m]))" } ],
       "description": "Relative contribution by outage cause label over the last 5m."
+    },
+    {
+      "type": "stat",
+      "title": "Total Download (1h)",
+      "gridPos": { "x": 0, "y": 42, "w": 6, "h": 4 },
+      "targets": [ { "expr": "sum_over_time(starlink_down_mbps[1h]) * 15 / 8000" } ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "none", "decimals": 2 }, "overrides": [] },
+      "description": "Approximate total download over last hour (GB). Assumes 15s scrape interval."
     }
   ]
 }
