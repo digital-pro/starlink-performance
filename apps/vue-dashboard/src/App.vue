@@ -101,8 +101,8 @@
           <h3 style="margin:0;">Bandwidth (Down / Up)</h3>
           <small style="color:#778;">starlink_down_mbps / starlink_up_mbps (recording rules)</small>
         </div>
-        <div v-if="!hasBandwidthData" style="height:120px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px;">No bandwidth data in selected window</div>
-        <v-chart v-else :option="bandwidthOption" autoresize style="height:120px; margin-top:8px;" />
+        <div v-if="!hasBandwidthData" style="height:240px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px;">No bandwidth data in selected window</div>
+        <v-chart v-else :option="bandwidthOption" autoresize style="height:240px; margin-top:8px;" />
       </div>
 
       
@@ -348,18 +348,22 @@ async function refreshAll() {
   const step = Math.max(10, Math.floor(seconds / 60));
   latencySeries.value = await fetchRangeProm(q.latency, seconds, step, fixedEnd);
   packetLossSeries.value = await fetchRangeProm(q.packetLoss, seconds, step, fixedEnd);
-  const [down, up, ml, downMBm, upMBm] = await Promise.all([
+  const [down, up, ml, downMBm, upMBm, downMB10, upMB10] = await Promise.all([
     fetchRangeProm(q.bandwidthDown, seconds, step, fixedEnd),
     fetchRangeProm(q.bandwidthUp, seconds, step, fixedEnd),
     fetchRangeProm('starlink_micro_loss * 100', seconds, step, fixedEnd),
     fetchRangeProm('avg_over_time(starlink_dish_downlink_throughput_bytes[1m]) * 60 / 1e6', seconds, step, fixedEnd),
-    fetchRangeProm('avg_over_time(starlink_dish_uplink_throughput_bytes[1m]) * 60 / 1e6', seconds, step, fixedEnd)
+    fetchRangeProm('avg_over_time(starlink_dish_uplink_throughput_bytes[1m]) * 60 / 1e6', seconds, step, fixedEnd),
+    fetchRangeProm('sum_over_time(starlink_dish_downlink_throughput_bytes[10m]) / 1e6', seconds, step, fixedEnd),
+    fetchRangeProm('sum_over_time(starlink_dish_uplink_throughput_bytes[10m]) / 1e6', seconds, step, fixedEnd)
   ]);
   bandwidthDownSeries.value = down;
   bandwidthUpSeries.value = up;
   microLossSeries.value = ml;
   downMbPerMinSeries.value = downMBm;
   upMbPerMinSeries.value = upMBm;
+  downMbPer10MinSeries.value = downMB10;
+  upMbPer10MinSeries.value = upMB10;
 
   // Flags
   const [spike, microLoss, outage, obstruction] = await Promise.all([
@@ -425,10 +429,12 @@ const microLossSeries = ref<Array<[number, number]>>([]);
 const packetLossSeries = ref<Array<[number, number]>>([]);
 const downMbPerMinSeries = ref<Array<[number, number]>>([]);
 const upMbPerMinSeries = ref<Array<[number, number]>>([]);
+const downMbPer10MinSeries = ref<Array<[number, number]>>([]);
+const upMbPer10MinSeries = ref<Array<[number, number]>>([]);
 
 
 const hasLatencyData = computed(() => latencySeries.value.length > 0 || packetLossSeries.value.length > 0);
-const hasBandwidthData = computed(() => bandwidthDownSeries.value.length > 0 || bandwidthUpSeries.value.length > 0 || microLossSeries.value.length > 0 || downMbPerMinSeries.value.length > 0 || upMbPerMinSeries.value.length > 0);
+const hasBandwidthData = computed(() => bandwidthDownSeries.value.length > 0 || bandwidthUpSeries.value.length > 0 || microLossSeries.value.length > 0 || downMbPerMinSeries.value.length > 0 || upMbPerMinSeries.value.length > 0 || downMbPer10MinSeries.value.length > 0 || upMbPer10MinSeries.value.length > 0);
 
 const latencyOption = computed(() => ({
   tooltip: { trigger: 'axis' },
@@ -453,12 +459,14 @@ const bandwidthOption = computed(() => ({
     { type: 'value', name: '%', position: 'right' },
     { type: 'value', name: 'MB/min', position: 'right', offset: 48 }
   ],
-  legend: { data: ['Down (Mbps)', 'Up (Mbps)', 'Down (MB/min)', 'Up (MB/min)', 'Micro-loss (%)'] },
+  legend: { data: ['Down (Mbps)', 'Up (Mbps)', 'Down (MB/min)', 'Up (MB/min)', 'Down (MB/10m)', 'Up (MB/10m)', 'Micro-loss (%)'] },
   series: [
     { type: 'line', name: 'Down (Mbps)', data: bandwidthDownSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 2 } },
     { type: 'line', name: 'Up (Mbps)', data: bandwidthUpSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 2 } },
     { type: 'line', name: 'Down (MB/min)', data: downMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5, type: 'dotted' } },
     { type: 'line', name: 'Up (MB/min)', data: upMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5, type: 'dotted' } },
+    { type: 'line', name: 'Down (MB/10m)', data: downMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5 } },
+    { type: 'line', name: 'Up (MB/10m)', data: upMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5 } },
     { type: 'line', name: 'Micro-loss (%)', data: microLossSeries.value, showSymbol: false, yAxisIndex: 1, lineStyle: { type: 'dashed', width: 2 } }
   ]
 }));
