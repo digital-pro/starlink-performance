@@ -47,6 +47,9 @@ Notes:
   PROVIDER=Starlink PROJECT_ROOT=/home/djc/levante/core-tasks/task-launcher npm run timings:all
   ```
 - You do not need to install Cypress in `levante-performance`. The runner loads Cypress from `PROJECT_ROOT`.
+- Video is OFF by default to reduce I/O and avoid large files. Enable per run with either:
+  - Environment variable: `VIDEO=1 npm run timings:one:auto -- intro`
+  - CLI flag: `node run_all_and_record.js --video intro`
 
 ### Direct node usage (advanced)
 

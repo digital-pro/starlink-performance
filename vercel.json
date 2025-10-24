@@ -10,7 +10,6 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/favicon.ico", "destination": "/public/favicon.ico" },
-    { "source": "/bucket-manifest.json", "destination": "/public/bucket-manifest.json" },
     { "source": "/", "destination": "/public/vue/index.html" },
     { "source": "/(.*)", "destination": "/public/vue/$1" }
   ],

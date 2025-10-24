@@ -2,6 +2,9 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
+import { exec as execCb } from 'child_process';
+import { promisify } from 'util';
+const exec = promisify(execCb);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -163,6 +166,28 @@ async function appendRunRecord(record) {
   const arr = await readJsonArray(runsJsonPath);
   arr.push(record);
   await writeJsonArray(runsJsonPath, arr);
+  // Push to dashboard for live overlays (best-effort)
+  try {
+    const url = process.env.DASHBOARD_PUSH_URL || 'http://localhost:3000/api/bench-push';
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(arr)
+    }).catch(() => {});
+  } catch {}
+  // Deploy and alias by default unless disabled
+  await maybeDeploy();
+}
+
+async function maybeDeploy() {
+  const optIn = (String(process.env.ALWAYS_DEPLOY || '').toLowerCase() === '1') || process.argv.includes('--deploy');
+  if (!optIn) return; // default: no deploy; opt-in only
+  try {
+    const repoRoot = path.resolve(__dirname, '..');
+    await exec('npm run deploy', { cwd: repoRoot, env: process.env });
+  } catch (e) {
+    // non-fatal
+  }
 }
 
 async function appendRunNdjson(record) {
@@ -179,6 +204,11 @@ async function runSpec(specFullPath, projectRoot, cypressLib) {
   let status = 'error';
   let results = undefined;
   let errorMessage = undefined;
+  const wantVideo = (
+    String(process.env.VIDEO || '').toLowerCase() === '1' ||
+    String(process.env.VIDEO || '').toLowerCase() === 'true' ||
+    process.argv.includes('--video')
+  );
   try {
     results = await cypressLib.run({
       project: projectRoot,
@@ -187,7 +217,7 @@ async function runSpec(specFullPath, projectRoot, cypressLib) {
       headless: true,
       spec: specFullPath,
       config: {
-        video: true,
+        video: wantVideo, // default off; enable via VIDEO=1 or --video
       },
     });
     const ok = results && results.totalFailed === 0 && results.status === 'finished';

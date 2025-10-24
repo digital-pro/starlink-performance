@@ -48,5 +48,43 @@
     },
     "startPT": "11:33 PT",
     "finishPT": "11:34 PT"
+  },
+  {
+    "task": "intro",
+    "spec": "cypress/e2e/intro.cy.js",
+    "timestamp": "2025-10-24T19:22:29.431Z",
+    "finishedAt": "2025-10-24T19:23:18.598Z",
+    "status": "failed",
+    "real": "0m49.167s",
+    "realSeconds": 49.167,
+    "cypressDurationMs": 22315,
+    "totals": {
+      "tests": 1,
+      "passes": 1,
+      "failures": 0,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "12:22 PT",
+    "finishPT": "12:23 PT"
+  },
+  {
+    "task": "intro",
+    "spec": "cypress/e2e/intro.cy.js",
+    "timestamp": "2025-10-24T19:51:49.037Z",
+    "finishedAt": "2025-10-24T19:52:20.019Z",
+    "status": "failed",
+    "real": "0m30.982s",
+    "realSeconds": 30.982,
+    "cypressDurationMs": 18885,
+    "totals": {
+      "tests": 1,
+      "passes": 1,
+      "failures": 0,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "12:51 PT",
+    "finishPT": "12:52 PT"
   }
 ]

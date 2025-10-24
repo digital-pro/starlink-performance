@@ -26,25 +26,6 @@
       </div>
     </section>
 
-    <!-- Bucket Info -->
-    <section style="margin-top: 24px;">
-      <h3 style="margin: 0 0 8px 0;" title="Aggregated info pulled from /bucket-manifest.json">Bucket Info</h3>
-      <div v-if="bucketRows.length === 0" style="padding:10px; color:#99a; font-size:12px; border:1px solid #eee; border-radius:10px; background:#fff;">No bucket data available</div>
-      <div v-else style="border:1px solid #eee; border-radius:12px; overflow:hidden; background:#fff;">
-        <div style="display:grid; grid-template-columns: 2fr 2fr 1fr 1fr; gap:0; background:#f8f9fb; border-bottom:1px solid #eee; padding:8px 10px; font-weight:600; color:#445;">
-          <div>Bucket</div>
-          <div>Stat</div>
-          <div>Language</div>
-          <div style="text-align:right;">Value</div>
-        </div>
-        <div v-for="(r, idx) in bucketRows" :key="idx" style="display:grid; grid-template-columns: 2fr 2fr 1fr 1fr; gap:0; padding:8px 10px; border-bottom:1px solid #f0f2f5; color:#334;">
-          <div>{{ r.bucket }}</div>
-          <div>{{ r.stat }}</div>
-          <div>{{ r.language }}</div>
-          <div style="text-align:right;">{{ format3(r.value) }}</div>
-        </div>
-      </div>
-    </section>
 
     <!-- Top metric cards removed per request -->
 
@@ -181,7 +162,7 @@ const corr = ref<{ drops: number | 'N/A'; cpu: number | 'N/A'; ac15: number | 'N
 
 const totalDownGb = ref<number | 'N/A'>('N/A');
 const nicSpeedMbps = ref<number | 'N/A'>('N/A');
-const bucketRows = ref<Array<{ bucket: string; stat: string; language: string; value: number }>>([]);
+// bucket info removed
 const rangeSeconds = ref<number>(3600);
 const rangeLabel = computed(() => (
   rangeSeconds.value === 600 ? '10 min' :
@@ -431,6 +412,7 @@ const downMbPerMinSeries = ref<Array<[number, number]>>([]);
 const upMbPerMinSeries = ref<Array<[number, number]>>([]);
 const downMbPer10MinSeries = ref<Array<[number, number]>>([]);
 const upMbPer10MinSeries = ref<Array<[number, number]>>([]);
+const benchRuns = ref<Array<{ task: string; start: number; end: number }>>([]);
 
 
 const hasLatencyData = computed(() => latencySeries.value.length > 0 || packetLossSeries.value.length > 0);
@@ -438,7 +420,7 @@ const hasBandwidthData = computed(() => bandwidthDownSeries.value.length > 0 || 
 
 const latencyOption = computed(() => ({
   tooltip: { trigger: 'axis' },
-  grid: { left: 40, right: 16, top: 24, bottom: 40 },
+  grid: { left: 40, right: 80, top: 24, bottom: 40 },
   xAxis: { type: 'time' },
   yAxis: [
     { type: 'value', name: 'ms' },
@@ -456,8 +438,8 @@ const bandwidthOption = computed(() => ({
   xAxis: { type: 'time' },
   yAxis: [
     { type: 'value', name: 'Mbps' },
-    { type: 'value', name: '%', position: 'right' },
-    { type: 'value', name: 'MB/min', position: 'right', offset: 48 }
+    { type: 'value', name: 'MB/min', position: 'right', offset: 0 },
+    { type: 'value', name: '%', position: 'right', offset: 48 }
   ],
   legend: { data: ['Down (Mbps)', 'Up (Mbps)', 'Down (MB/min)', 'Up (MB/min)', 'Down (MB/10m)', 'Up (MB/10m)', 'Micro-loss (%)'] },
   series: [
@@ -468,7 +450,15 @@ const bandwidthOption = computed(() => ({
     { type: 'line', name: 'Down (MB/10m)', data: downMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5 } },
     { type: 'line', name: 'Up (MB/10m)', data: upMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5 } },
     { type: 'line', name: 'Micro-loss (%)', data: microLossSeries.value, showSymbol: false, yAxisIndex: 1, lineStyle: { type: 'dashed', width: 2 } }
-  ]
+  ],
+  markLine: {
+    symbol: ['none','none'],
+    label: { show: true, formatter: (p) => (p?.name || '') },
+    data: benchRuns.value.flatMap(run => ([
+      { name: `${run.task} start`, xAxis: run.start, lineStyle: { color: '#0a7', width: 1.5 } },
+      { name: `${run.task} end`, xAxis: run.end, lineStyle: { color: '#b30000', width: 1.5 } }
+    ]))
+  }
 }));
 
 function flagStyle(active: boolean) {
@@ -486,7 +476,6 @@ function flagStyle(active: boolean) {
 
 onMounted(() => {
   refreshAll();
-  loadBucketInfo();
 });
 </script>
 
