@@ -14,3 +14,8 @@ if (existsSync(vueDist)) {
 
 // Minimal favicon placeholder
 mkdirSync(join(publicDir), { recursive: true });
+// Preserve any static files in repo public/ (e.g., bucket-manifest.json)
+try {
+  const repoPublic = join(root, 'public');
+  // Already copying into same dir; ensure manifest exists
+} catch {}

@@ -16,6 +16,33 @@
         <span style="padding:4px 8px; border-radius:8px; background:#eef; border:1px solid #dde;">Latency↔Drops: {{ formatCorr(corr.drops) }}</span>
         <span style="padding:4px 8px; border-radius:8px; background:#eef; border:1px solid #dde;">Latency↔CPU: {{ formatCorr(corr.cpu) }}</span>
         <span :style="flagStyle(corr.periodic)">15s periodicity: {{ corr.periodic ? 'YES' : 'no' }}</span>
+        <span style="margin-left:12px;">Range:</span>
+        <select v-model="rangeSeconds" @change="refreshAll" style="padding:4px 8px; border-radius:6px; border:1px solid #ccd; background:white;">
+          <option :value="600">Last 10 minutes</option>
+          <option :value="3600">Last 1 hour</option>
+          <option :value="21600">Last 6 hours</option>
+          <option :value="43200">Last 12 hours</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Bucket Info -->
+    <section style="margin-top: 24px;">
+      <h3 style="margin: 0 0 8px 0;" title="Aggregated info pulled from /bucket-manifest.json">Bucket Info</h3>
+      <div v-if="bucketRows.length === 0" style="padding:10px; color:#99a; font-size:12px; border:1px solid #eee; border-radius:10px; background:#fff;">No bucket data available</div>
+      <div v-else style="border:1px solid #eee; border-radius:12px; overflow:hidden; background:#fff;">
+        <div style="display:grid; grid-template-columns: 2fr 2fr 1fr 1fr; gap:0; background:#f8f9fb; border-bottom:1px solid #eee; padding:8px 10px; font-weight:600; color:#445;">
+          <div>Bucket</div>
+          <div>Stat</div>
+          <div>Language</div>
+          <div style="text-align:right;">Value</div>
+        </div>
+        <div v-for="(r, idx) in bucketRows" :key="idx" style="display:grid; grid-template-columns: 2fr 2fr 1fr 1fr; gap:0; padding:8px 10px; border-bottom:1px solid #f0f2f5; color:#334;">
+          <div>{{ r.bucket }}</div>
+          <div>{{ r.stat }}</div>
+          <div>{{ r.language }}</div>
+          <div style="text-align:right;">{{ format3(r.value) }}</div>
+        </div>
       </div>
     </section>
 
@@ -24,9 +51,13 @@
     <!-- Totals -->
     <section style="margin-top: 12px;">
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; min-width:200px;">
+        <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; min-width:200px;" title="Sum of downlink Mbps over last hour converted to GB (assumes 15s scrape interval)">
           <div style="font-size:12px; color:#778;">Total Download (last hour)</div>
           <div style="font-size:20px; font-weight:600;">{{ formatGb(totalDownGb) }} GB</div>
+        </div>
+        <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; min-width:200px;" title="Host NIC link speed, from Netdata net_speed metric (Mbps). This is interface capability, not actual throughput.">
+          <div style="font-size:12px; color:#778;">NIC Link speed</div>
+          <div style="font-size:20px; font-weight:600;">{{ format3(nicSpeedMbps) }} Mbps</div>
         </div>
       </div>
     </section>
@@ -34,30 +65,30 @@
     <section style="margin-top: 24px; display:grid; grid-template-columns: 1fr; gap: 16px;">
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">Starlink Diagnostics</h3>
+          <h3 style="margin:0;" title="Diagnostic flags derived from recording rules for common issues">Starlink Diagnostics</h3>
           <small style="color:#778;">spike / micro-loss / outage / obstruction</small>
         </div>
         <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin-top:12px;">
           <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; display:flex; align-items:center; justify-content:center;">
-            <span :style="flagStyle(flags.latencySpike)" title="Latency spike: starlink_latency_spike recording rule indicates short-term spike vs baseline">Latency spike</span>
+            <span :style="flagStyle(flags.latencySpike)" title="Latency spike: starlink_latency_spike > 0 indicates short-term spike vs baseline">Latency spike</span>
           </div>
           <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; display:flex; align-items:center; justify-content:center;">
             <span :style="flagStyle(flags.microLoss)" title="Micro‑loss: sustained 1–2% packet loss typical on Starlink">Micro‑loss</span>
           </div>
           <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; display:flex; align-items:center; justify-content:center;">
-            <span :style="flagStyle(flags.outage)" title="Outage: starlink_dish_outage_duration increasing">Outage active</span>
+            <span :style="flagStyle(flags.outage)" title="Outage: starlink_outage_active > 0 when outage duration increases">Outage active</span>
           </div>
           <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; display:flex; align-items:center; justify-content:center;">
-            <span :style="flagStyle(flags.obstruction)" title="Obstruction: wedge_abs_fraction_obstruction_ratio over threshold">Obstruction</span>
+            <span :style="flagStyle(flags.obstruction)" title="Obstruction: obstruction indicator > 0.2 over 5m">Obstruction</span>
           </div>
         </div>
       </div>
 
-      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;" title="Latency (ms) over time; packet loss (%) overlaid on right axis">
+      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;" title="Latency (ms) from starlink_latency_ms; packet loss (%) overlaid from starlink_packet_loss_pct">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
           <div style="display:flex; align-items:center; gap:10px;">
-            <h3 style="margin:0;">Latency (last 10 min)</h3>
-            <button @click="openLossDetails" style="padding:4px 8px; border:1px solid #08c; background:#08c; color:white; border-radius:6px; cursor:pointer; font-size:12px;">Packet loss details</button>
+            <h3 style="margin:0;">Latency (last {{ rangeLabel }})</h3>
+            <button @click="openLossDetails" style="padding:4px 8px; border:1px solid #08c; background:#08c; color:white; border-radius:6px; cursor:pointer; font-size:12px;" title="Opens a modal with current/avg/max loss stats across multiple windows">Packet loss details</button>
           </div>
           <small style="color:#778;">starlink_latency_ms (recording rule)</small>
         </div>
@@ -65,7 +96,7 @@
         <v-chart v-else :option="latencyOption" autoresize style="height:120px; margin-top:8px;" />
       </div>
 
-      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;" title="Bandwidth (Mbps) with micro-loss (%) overlaid on right axis">
+      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;" title="Down/Up Mbps (1m avg). Dashed lines show nominal (p95 over 24h). Micro-loss (%) overlaid on right axis.">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Bandwidth (Down / Up)</h3>
           <small style="color:#778;">starlink_down_mbps / starlink_up_mbps (recording rules)</small>
@@ -74,21 +105,7 @@
         <v-chart v-else :option="bandwidthOption" autoresize style="height:120px; margin-top:8px;" />
       </div>
 
-      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">Preflight Issues</h3>
-          <small style="color:#778;">GitHub</small>
-        </div>
-        <div v-if="ghLoading" style="padding:10px; color:#99a; font-size:12px;">Loading…</div>
-        <div v-else-if="ghError" style="padding:10px; color:#a55; font-size:12px;">{{ ghError }}</div>
-        <ul v-else style="margin:8px 0 0 0; padding:0 0 0 16px;">
-          <li v-for="it in issues" :key="it.id" style="margin:6px 0;">
-            <a :href="it.html_url" target="_blank" rel="noopener noreferrer">#{{ it.number }} {{ it.title }}</a>
-            <small style="color:#778;"> ({{ it.state }})</small>
-          </li>
-          <li v-if="issues.length === 0" style="color:#99a; font-size:12px; list-style: none;">No open issues</li>
-        </ul>
-      </div>
+      
     </section>
 
     <!-- Packet Loss Details Modal -->
@@ -163,6 +180,15 @@ const flags = ref<{ latencySpike: boolean; microLoss: boolean; outage: boolean; 
 const corr = ref<{ drops: number | 'N/A'; cpu: number | 'N/A'; ac15: number | 'N/A'; periodic: boolean }>({ drops: 'N/A', cpu: 'N/A', ac15: 'N/A', periodic: false });
 
 const totalDownGb = ref<number | 'N/A'>('N/A');
+const nicSpeedMbps = ref<number | 'N/A'>('N/A');
+const bucketRows = ref<Array<{ bucket: string; stat: string; language: string; value: number }>>([]);
+const rangeSeconds = ref<number>(3600);
+const rangeLabel = computed(() => (
+  rangeSeconds.value === 600 ? '10 min' :
+  rangeSeconds.value === 3600 ? '1 hour' :
+  rangeSeconds.value === 21600 ? '6 hours' :
+  rangeSeconds.value === 43200 ? '12 hours' : `${Math.round(rangeSeconds.value/3600)} hours`
+));
 const showLossDetails = ref(false);
 const lossStats = ref({
   current: 'N/A' as number | 'N/A',
@@ -191,6 +217,53 @@ function format3(value: number | string): string | number {
     if (Number.isFinite(n)) return n.toFixed(3);
   }
   return value;
+}
+
+type BucketManifest = {
+  buckets: Array<{
+    name: string;
+    languages: Array<{ code: string; coreTasksMp3: string[] }>;
+  }>;
+};
+
+function getAudioDuration(url: string): Promise<number> {
+  return new Promise((resolve) => {
+    try {
+      const audio = new Audio();
+      audio.preload = 'metadata';
+      (audio as any).crossOrigin = 'anonymous';
+      const cleanup = () => { try { audio.src = ''; } catch {} };
+      audio.addEventListener('loadedmetadata', () => {
+        const d = Number((audio as any).duration);
+        cleanup();
+        resolve(Number.isFinite(d) ? d : 0);
+      }, { once: true });
+      audio.addEventListener('error', () => { cleanup(); resolve(0); }, { once: true });
+      (audio as any).src = url;
+    } catch {
+      resolve(0);
+    }
+  });
+}
+
+async function loadBucketInfo() {
+  try {
+    const res = await fetch('/bucket-manifest.json', { cache: 'no-store' });
+    if (!res.ok) { bucketRows.value = []; return; }
+    const manifest = await res.json() as BucketManifest;
+    const rows: Array<{ bucket: string; stat: string; language: string; value: number }> = [];
+    for (const b of (manifest?.buckets || [])) {
+      for (const lang of (b.languages || [])) {
+        const urls = Array.isArray(lang.coreTasksMp3) ? lang.coreTasksMp3 : [];
+        const durations = await Promise.all(urls.map(u => getAudioDuration(u)));
+        const totalSec = durations.reduce((a, s) => a + (Number.isFinite(s) ? s : 0), 0);
+        rows.push({ bucket: b.name, stat: 'core-tasks e2e play time (s)', language: lang.code, value: totalSec });
+      }
+    }
+    bucketRows.value = rows;
+  } catch {
+    bucketRows.value = [];
+  }
 }
 
 function displayValue(key: typeof metricCards[number]['key']) {
@@ -266,17 +339,27 @@ async function refreshAll() {
   const totalGb = await fetchInstantProm('sum_over_time(starlink_down_mbps[1h]) * 15 / 8000');
   totalDownGb.value = typeof totalGb === 'number' && Number.isFinite(totalGb) ? totalGb : 'N/A';
 
+  // NIC link speed (Mbps): netdata_net_speed_kilobits_persec_average{dimension="speed"} / 1000
+  const nic = await fetchInstantProm('netdata_net_speed_kilobits_persec_average{dimension="speed"} / 1000');
+  nicSpeedMbps.value = typeof nic === 'number' && Number.isFinite(nic) ? nic : 'N/A';
+
   const fixedEnd = Math.floor(Date.now() / 1000);
-  latencySeries.value = await fetchRangeProm(q.latency, 600, 10, fixedEnd);
-  packetLossSeries.value = await fetchRangeProm(q.packetLoss, 600, 10, fixedEnd);
-  const [down, up, ml] = await Promise.all([
-    fetchRangeProm(q.bandwidthDown, 600, 10, fixedEnd),
-    fetchRangeProm(q.bandwidthUp, 600, 10, fixedEnd),
-    fetchRangeProm('starlink_micro_loss * 100', 600, 10, fixedEnd)
+  const seconds = rangeSeconds.value;
+  const step = Math.max(10, Math.floor(seconds / 60));
+  latencySeries.value = await fetchRangeProm(q.latency, seconds, step, fixedEnd);
+  packetLossSeries.value = await fetchRangeProm(q.packetLoss, seconds, step, fixedEnd);
+  const [down, up, ml, downMBm, upMBm] = await Promise.all([
+    fetchRangeProm(q.bandwidthDown, seconds, step, fixedEnd),
+    fetchRangeProm(q.bandwidthUp, seconds, step, fixedEnd),
+    fetchRangeProm('starlink_micro_loss * 100', seconds, step, fixedEnd),
+    fetchRangeProm('avg_over_time(starlink_dish_downlink_throughput_bytes[1m]) * 60 / 1e6', seconds, step, fixedEnd),
+    fetchRangeProm('avg_over_time(starlink_dish_uplink_throughput_bytes[1m]) * 60 / 1e6', seconds, step, fixedEnd)
   ]);
   bandwidthDownSeries.value = down;
   bandwidthUpSeries.value = up;
   microLossSeries.value = ml;
+  downMbPerMinSeries.value = downMBm;
+  upMbPerMinSeries.value = upMBm;
 
   // Flags
   const [spike, microLoss, outage, obstruction] = await Promise.all([
@@ -340,14 +423,12 @@ const bandwidthDownSeries = ref<Array<[number, number]>>([]);
 const bandwidthUpSeries = ref<Array<[number, number]>>([]);
 const microLossSeries = ref<Array<[number, number]>>([]);
 const packetLossSeries = ref<Array<[number, number]>>([]);
+const downMbPerMinSeries = ref<Array<[number, number]>>([]);
+const upMbPerMinSeries = ref<Array<[number, number]>>([]);
 
-// GitHub Issues (Preflight)
-const issues = ref<Array<{ id: number; number: number; title: string; html_url: string; state: string }>>([]);
-const ghLoading = ref(false);
-const ghError = ref<string | null>(null);
 
 const hasLatencyData = computed(() => latencySeries.value.length > 0 || packetLossSeries.value.length > 0);
-const hasBandwidthData = computed(() => bandwidthDownSeries.value.length > 0 || bandwidthUpSeries.value.length > 0 || microLossSeries.value.length > 0);
+const hasBandwidthData = computed(() => bandwidthDownSeries.value.length > 0 || bandwidthUpSeries.value.length > 0 || microLossSeries.value.length > 0 || downMbPerMinSeries.value.length > 0 || upMbPerMinSeries.value.length > 0);
 
 const latencyOption = computed(() => ({
   tooltip: { trigger: 'axis' },
@@ -369,12 +450,15 @@ const bandwidthOption = computed(() => ({
   xAxis: { type: 'time' },
   yAxis: [
     { type: 'value', name: 'Mbps' },
-    { type: 'value', name: '%', position: 'right' }
+    { type: 'value', name: '%', position: 'right' },
+    { type: 'value', name: 'MB/min', position: 'right', offset: 48 }
   ],
-  legend: { data: ['Down (Mbps)', 'Up (Mbps)', 'Micro-loss (%)'] },
+  legend: { data: ['Down (Mbps)', 'Up (Mbps)', 'Down (MB/min)', 'Up (MB/min)', 'Micro-loss (%)'] },
   series: [
     { type: 'line', name: 'Down (Mbps)', data: bandwidthDownSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 2 } },
     { type: 'line', name: 'Up (Mbps)', data: bandwidthUpSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 2 } },
+    { type: 'line', name: 'Down (MB/min)', data: downMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5, type: 'dotted' } },
+    { type: 'line', name: 'Up (MB/min)', data: upMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5, type: 'dotted' } },
     { type: 'line', name: 'Micro-loss (%)', data: microLossSeries.value, showSymbol: false, yAxisIndex: 1, lineStyle: { type: 'dashed', width: 2 } }
   ]
 }));
@@ -394,21 +478,7 @@ function flagStyle(active: boolean) {
 
 onMounted(() => {
   refreshAll();
-  // Load preflight issues (expects GH_TOKEN/GH_REPO set server-side)
-  (async () => {
-    ghLoading.value = true;
-    ghError.value = null;
-    try {
-      const r = await axios.get('/api/github-issues');
-      const arr = r.data?.issues || [];
-      issues.value = Array.isArray(arr) ? arr.slice(0, 10) : [];
-    } catch (e: any) {
-      ghError.value = 'Failed to load issues';
-      issues.value = [];
-    } finally {
-      ghLoading.value = false;
-    }
-  })();
+  loadBucketInfo();
 });
 </script>
 

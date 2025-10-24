@@ -15,6 +15,17 @@ groups:
       - record: starlink_up_mbps
         expr: avg_over_time(starlink_dish_uplink_throughput_bytes[1m]) * 8 / 1e6
 
+      # Nominal link capacity estimates (95th percentile over 24h)
+      - record: starlink_down_nominal_mbps
+        expr: quantile_over_time(0.95, starlink_dish_downlink_throughput_bytes[24h]) * 8 / 1e6
+
+      - record: starlink_up_nominal_mbps
+        expr: quantile_over_time(0.95, starlink_dish_uplink_throughput_bytes[24h]) * 8 / 1e6
+
+      # Placeholder: Per-app traffic via Netdata (enable once metrics confirmed)
+      # - record: app_net_kbps
+      #   expr: sum by (dimension) (netdata_apps_net_kilobits_persec_average{chart="apps.net"})
+
       # 15-second reconfiguration spikes detector
       - record: starlink_latency_spike
         expr: rate(starlink_dish_pop_ping_latency_seconds[30s]) > (avg_over_time(starlink_dish_pop_ping_latency_seconds[5m]) * 1.5)

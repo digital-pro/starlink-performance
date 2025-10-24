@@ -90,6 +90,16 @@ scrape_configs:
   - job_name: node
     static_configs: [{ targets: ['${NODE}'] }]
 
+  - job_name: netdata
+    metrics_path: /api/v1/allmetrics
+    params:
+      format: [prometheus]
+      help: [yes]
+      types: [yes]
+      timestamps: [yes]
+      names: [yes]
+    static_configs: [{ targets: ['${NETDATA}'] }]
+
 remote_write:
   - url: https://prometheus-prod-36-prod-us-west-0.grafana.net/api/prom/push
     basic_auth:

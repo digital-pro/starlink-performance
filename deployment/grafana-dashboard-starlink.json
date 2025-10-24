@@ -49,17 +49,27 @@
     },
     {
       "type": "timeseries",
-      "title": "Bandwidth (Down/Up) + Micro-loss",
+      "title": "Bandwidth (Down/Up) + Nominal + Micro-loss",
       "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
       "targets": [
         { "expr": "starlink_down_mbps", "legendFormat": "Down (Mbps)" },
         { "expr": "starlink_up_mbps", "legendFormat": "Up (Mbps)" },
+        { "expr": "starlink_down_nominal_mbps", "legendFormat": "Down nominal" },
+        { "expr": "starlink_up_nominal_mbps", "legendFormat": "Up nominal" },
         { "expr": "starlink_micro_loss * 100", "legendFormat": "Micro-loss (%)" }
       ],
       "description": "Down/Up Mbps (left axis) with micro-loss % (right axis) to reveal loss during bursts.",
       "fieldConfig": {
         "defaults": { "unit": "Mbps" },
         "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Down nominal" },
+            "properties": [ { "id": "custom.lineStyle", "value": { "type": "dash" } } ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Up nominal" },
+            "properties": [ { "id": "custom.lineStyle", "value": { "type": "dash" } } ]
+          },
           {
             "matcher": { "id": "byName", "options": "Micro-loss (%)" },
             "properties": [
@@ -173,6 +183,15 @@
       "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value" },
       "fieldConfig": { "defaults": { "unit": "none", "decimals": 2 }, "overrides": [] },
       "description": "Approximate total download over last hour (GB). Assumes 15s scrape interval."
+    },
+    {
+      "type": "stat",
+      "title": "NIC link speed (Mbps)",
+      "gridPos": { "x": 6, "y": 42, "w": 6, "h": 4 },
+      "targets": [ { "expr": "netdata_net_speed_kilobits_persec_average{dimension=\"speed\"} / 1000" } ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "Mbps", "decimals": 0 }, "overrides": [] },
+      "description": "Host interface link speed as reported by Netdata."
     }
   ]
 }
