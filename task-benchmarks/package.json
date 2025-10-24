@@ -3,6 +3,8 @@
   "scripts": {
     "timings:all": "PROJECT_ROOT=../core-tasks/task-launcher node run_all_and_record.js",
     "timings:one": "PROJECT_ROOT=../core-tasks/task-launcher node run_all_and_record.js",
-    "timings:backfill": "node backfill_times.js"
+    "timings:backfill": "node backfill_times.js",
+    "timings:all:auto": "node run_all_and_record.js",
+    "timings:one:auto": "node run_all_and_record.js"
   }
 }

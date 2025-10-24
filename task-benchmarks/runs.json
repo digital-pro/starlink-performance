@@ -1,1 +1,52 @@
-[]
+[
+  {
+    "task": "intro",
+    "spec": "cypress/e2e/intro.cy.js",
+    "timestamp": "2025-10-24T18:28:07.953Z",
+    "finishedAt": "2025-10-24T18:28:10.954Z",
+    "status": "failed",
+    "real": "0m3.001s",
+    "realSeconds": 3.001,
+    "totals": {},
+    "startPT": "11:28 PT",
+    "finishPT": "11:28 PT"
+  },
+  {
+    "task": "intro",
+    "spec": "cypress/e2e/intro.cy.js",
+    "timestamp": "2025-10-24T18:30:04.415Z",
+    "finishedAt": "2025-10-24T18:30:48.261Z",
+    "status": "failed",
+    "real": "0m43.846s",
+    "realSeconds": 43.846,
+    "cypressDurationMs": 2253,
+    "totals": {
+      "tests": 1,
+      "passes": 0,
+      "failures": 1,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "11:30 PT",
+    "finishPT": "11:30 PT"
+  },
+  {
+    "task": "intro",
+    "spec": "cypress/e2e/intro.cy.js",
+    "timestamp": "2025-10-24T18:33:40.539Z",
+    "finishedAt": "2025-10-24T18:34:26.817Z",
+    "status": "failed",
+    "real": "0m46.278s",
+    "realSeconds": 46.278,
+    "cypressDurationMs": 26302,
+    "totals": {
+      "tests": 1,
+      "passes": 1,
+      "failures": 0,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "11:33 PT",
+    "finishPT": "11:34 PT"
+  }
+]

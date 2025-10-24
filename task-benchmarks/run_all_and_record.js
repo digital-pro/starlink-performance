@@ -21,17 +21,43 @@ async function pathExists(p) {
 
 async function resolveProjectRoot() {
   const envRoot = process.env.PROJECT_ROOT;
-  if (envRoot) return path.resolve(envRoot);
+  if (envRoot) {
+    // If provided and absolute, use as-is
+    if (path.isAbsolute(envRoot)) return envRoot;
+    // Try resolving relative to this script's dir (and its parent), not CWD
+    const relCandidates = [
+      path.resolve(__dirname, envRoot),
+      path.resolve(__dirname, '..', envRoot),
+      path.resolve(process.cwd(), envRoot)
+    ];
+    for (const c of relCandidates) {
+      if (await pathExists(path.join(c, 'cypress.config.js'))) return c;
+    }
+    // Fallback to CWD resolution when not found
+    return path.resolve(envRoot);
+  }
+  // Search up to 5 ancestors for sibling core-tasks/task-launcher
+  const ancestors = [];
+  let cur = __dirname;
+  for (let i = 0; i < 5; i++) {
+    ancestors.push(cur);
+    const next = path.dirname(cur);
+    if (next === cur) break;
+    cur = next;
+  }
   const candidates = [
-    // If this script lives inside task-launcher
-    path.resolve(__dirname, '..', '..'),
-    // If this script is copied to ../levante-performance/task-benchmarks
-    path.resolve(__dirname, '..', '..', '..', 'core-tasks', 'task-launcher'),
+    // typical mono-repo layout: levante-performance/task-benchmarks → ../../core-tasks/task-launcher
+    ...ancestors.map(a => path.resolve(a, 'core-tasks', 'task-launcher')),
+    // direct sibling fallback
     path.resolve(__dirname, '..', '..', 'task-launcher'),
   ];
   for (const c of candidates) {
     if (await pathExists(path.join(c, 'cypress.config.js'))) return c;
   }
+  // Verbose hint for troubleshooting
+  console.warn('[bench] Could not auto-detect PROJECT_ROOT from candidates:', candidates.join(' | '));
+  // Prefer sibling core-tasks default if present, otherwise fall back to repo root
+  if (await pathExists(path.join(candidates[1], 'cypress.config.js'))) return candidates[1];
   return candidates[0];
 }
 
@@ -155,6 +181,8 @@ async function runSpec(specFullPath, projectRoot, cypressLib) {
   let errorMessage = undefined;
   try {
     results = await cypressLib.run({
+      project: projectRoot,
+      configFile: path.join(projectRoot, 'cypress.config.js'),
       browser: 'electron',
       headless: true,
       spec: specFullPath,
