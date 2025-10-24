@@ -5,11 +5,17 @@ npm-debug.log*
 .vercel/
 public/
 apps/*/dist/
-.vercel
+
+# Secrets - never commit service account keys
 secrets/
-# local logs (Prometheus helper, exporter, script outputs)
-logs/
-# local prom TSDB data
+*.key.json
+
+# Keep these config files
+!package.json
+!package-lock.json
+!vercel.json
+!cors.json
+!tsconfig.json
 data/
 # legacy helper cache (now migrated to logs/)
 deployment/.cache/

@@ -36,5 +36,8 @@
   "devDependencies": {
     "http-server": "^14.1.1",
     "vercel": "^48.4.0"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^7.17.2"
   }
 }

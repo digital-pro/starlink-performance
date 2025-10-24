@@ -298,6 +298,18 @@ async function fetchRangeProm(query: string, seconds = 600, step = 10, fixedEnd?
 }
 
 async function refreshAll() {
+  // Fetch benchmark runs for vertical line markers
+  try {
+    const runsRes = await axios.get('/api/bench-runs');
+    console.log('📊 Benchmark runs response:', runsRes.data);
+    if (runsRes.data?.ok && Array.isArray(runsRes.data.runs)) {
+      benchRuns.value = runsRes.data.runs;
+      console.log(`✅ Loaded ${benchRuns.value.length} benchmark runs:`, benchRuns.value);
+    }
+  } catch (e) {
+    console.error('❌ Could not fetch benchmark runs:', e);
+  }
+
   const q = {
     latency: 'starlink_latency_ms',
     packetLoss: 'starlink_packet_loss_pct',
@@ -406,6 +418,7 @@ function closeLossDetails() {
 const latencySeries = ref<Array<[number, number]>>([]);
 const bandwidthDownSeries = ref<Array<[number, number]>>([]);
 const bandwidthUpSeries = ref<Array<[number, number]>>([]);
+const benchmarkRuns = ref<Array<{ task: string; start: number; end: number }>>([]);
 const microLossSeries = ref<Array<[number, number]>>([]);
 const packetLossSeries = ref<Array<[number, number]>>([]);
 const downMbPerMinSeries = ref<Array<[number, number]>>([]);
@@ -418,19 +431,45 @@ const benchRuns = ref<Array<{ task: string; start: number; end: number }>>([]);
 const hasLatencyData = computed(() => latencySeries.value.length > 0 || packetLossSeries.value.length > 0);
 const hasBandwidthData = computed(() => bandwidthDownSeries.value.length > 0 || bandwidthUpSeries.value.length > 0 || microLossSeries.value.length > 0 || downMbPerMinSeries.value.length > 0 || upMbPerMinSeries.value.length > 0 || downMbPer10MinSeries.value.length > 0 || upMbPer10MinSeries.value.length > 0);
 
-const latencyOption = computed(() => ({
-  tooltip: { trigger: 'axis' },
-  grid: { left: 40, right: 80, top: 24, bottom: 40 },
-  xAxis: { type: 'time' },
-  yAxis: [
-    { type: 'value', name: 'ms' },
-    { type: 'value', name: '%', position: 'right' }
-  ],
-  series: [
-    { type: 'line', name: 'Latency', data: latencySeries.value, showSymbol: false, smooth: true, lineStyle: { width: 2 }, yAxisIndex: 0 },
-    { type: 'line', name: 'Packet Loss (%)', data: packetLossSeries?.value || [], showSymbol: false, lineStyle: { width: 2, type: 'dashed' }, yAxisIndex: 1 }
-  ]
-}));
+const latencyOption = computed(() => {
+  const markLineData = benchRuns.value.flatMap(run => ([
+    { name: `${run.task} ▶`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 } },
+    { name: `${run.task} ◼`, xAxis: run.end, lineStyle: { color: '#b30000', width: 2 } }
+  ]));
+  
+  console.log('📈 Latency markLine data:', { 
+    benchRunsCount: benchRuns.value.length, 
+    markLineData,
+    benchRuns: benchRuns.value 
+  });
+  
+  return {
+    tooltip: { trigger: 'axis' },
+    grid: { left: 40, right: 80, top: 24, bottom: 40 },
+    xAxis: { type: 'time' },
+    yAxis: [
+      { type: 'value', name: 'ms' },
+      { type: 'value', name: '%', position: 'right' }
+    ],
+    series: [
+      { 
+        type: 'line', 
+        name: 'Latency', 
+        data: latencySeries.value, 
+        showSymbol: false, 
+        smooth: true, 
+        lineStyle: { width: 2 }, 
+        yAxisIndex: 0,
+        markLine: benchRuns.value.length > 0 ? {
+          symbol: ['none','none'],
+          label: { show: true, formatter: (p) => (p?.name || ''), fontSize: 10 },
+          data: markLineData
+        } : undefined
+      },
+      { type: 'line', name: 'Packet Loss (%)', data: packetLossSeries?.value || [], showSymbol: false, lineStyle: { width: 2, type: 'dashed' }, yAxisIndex: 1 }
+    ]
+  };
+});
 
 const bandwidthOption = computed(() => ({
   tooltip: { trigger: 'axis' },
@@ -443,22 +482,30 @@ const bandwidthOption = computed(() => ({
   ],
   legend: { data: ['Down (Mbps)', 'Up (Mbps)', 'Down (MB/min)', 'Up (MB/min)', 'Down (MB/10m)', 'Up (MB/10m)', 'Micro-loss (%)'] },
   series: [
-    { type: 'line', name: 'Down (Mbps)', data: bandwidthDownSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 2 } },
+    { 
+      type: 'line', 
+      name: 'Down (Mbps)', 
+      data: bandwidthDownSeries.value, 
+      showSymbol: false, 
+      smooth: true, 
+      yAxisIndex: 0, 
+      lineStyle: { width: 2 },
+      markLine: benchRuns.value.length > 0 ? {
+        symbol: ['none','none'],
+        label: { show: true, formatter: (p) => (p?.name || ''), fontSize: 10 },
+        data: benchRuns.value.flatMap(run => ([
+          { name: `${run.task} ▶`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 } },
+          { name: `${run.task} ◼`, xAxis: run.end, lineStyle: { color: '#b30000', width: 2 } }
+        ]))
+      } : undefined
+    },
     { type: 'line', name: 'Up (Mbps)', data: bandwidthUpSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 2 } },
     { type: 'line', name: 'Down (MB/min)', data: downMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5, type: 'dotted' } },
     { type: 'line', name: 'Up (MB/min)', data: upMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5, type: 'dotted' } },
     { type: 'line', name: 'Down (MB/10m)', data: downMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5 } },
     { type: 'line', name: 'Up (MB/10m)', data: upMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5 } },
     { type: 'line', name: 'Micro-loss (%)', data: microLossSeries.value, showSymbol: false, yAxisIndex: 1, lineStyle: { type: 'dashed', width: 2 } }
-  ],
-  markLine: {
-    symbol: ['none','none'],
-    label: { show: true, formatter: (p) => (p?.name || '') },
-    data: benchRuns.value.flatMap(run => ([
-      { name: `${run.task} start`, xAxis: run.start, lineStyle: { color: '#0a7', width: 1.5 } },
-      { name: `${run.task} end`, xAxis: run.end, lineStyle: { color: '#b30000', width: 1.5 } }
-    ]))
-  }
+  ]
 }));
 
 function flagStyle(active: boolean) {
