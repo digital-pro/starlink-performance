@@ -161,6 +161,17 @@ If your metrics originate from local Prometheus instances, use `deployment/` hel
   - `deployment/apply-remote-write.sh`: safe merge + optional restart.
   - `deployment/run-wsl-prom.sh`: convenience launcher for a lightweight Prometheus in WSL.
 
+### WiFi Link Speed Exporter (WSL2)
+
+The dashboard displays Windows WiFi adapter link speed via a custom Node.js exporter:
+
+- **Script**: `scripts/wifi-exporter.mjs` - Queries Windows WiFi adapter via PowerShell and exposes `windows_wifi_link_speed_mbps` metric
+- **Port**: 9818
+- **Auto-start**: Included in `npm run restart:stack` and systemd service
+- **Metric**: `windows_wifi_link_speed_mbps` - Current WiFi link speed in Mbps (e.g., 65, 866, 1200)
+
+This is the **negotiated connection speed** between your WiFi adapter and router, not your internet speed. It adjusts dynamically based on signal quality and will be lower than your actual Starlink throughput.
+
 Steps (example):
 ```bash
 # save your write token (metrics:write) locally and keep it secret

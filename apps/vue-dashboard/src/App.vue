@@ -24,46 +24,67 @@
           <option :value="21600">Last 6 hours</option>
           <option :value="43200">Last 12 hours</option>
         </select>
+        <span style="margin-left:16px; display:flex; align-items:center; gap:8px;">
+          <label style="display:flex; align-items:center; gap:4px;">
+            <span style="font-size:12px;">Baseline Down:</span>
+            <input v-model.number="baselineDownMbps" type="number" step="0.1" min="0" style="width:50px; padding:2px 4px; border:1px solid #ccd; border-radius:4px; text-align:right;" />
+            <span style="font-size:11px; color:#778;">Mbps</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:4px;">
+            <span style="font-size:12px;">Baseline Up:</span>
+            <input v-model.number="baselineUpMbps" type="number" step="0.1" min="0" style="width:50px; padding:2px 4px; border:1px solid #ccd; border-radius:4px; text-align:right;" />
+            <span style="font-size:11px; color:#778;">Mbps</span>
+          </label>
+        </span>
       </div>
     </section>
 
 
     <!-- Top metric cards removed per request -->
 
-    <!-- Totals -->
+    <!-- Totals and Diagnostics in one row -->
     <section style="margin-top: 12px;">
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; min-width:200px;" title="Sum of downlink Mbps over last hour converted to GB (assumes 15s scrape interval)">
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
+        <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff;" title="Sum of downlink Mbps over last hour converted to GB (assumes 15s scrape interval)">
           <div style="font-size:12px; color:#778;">Total Download (last hour)</div>
           <div style="font-size:20px; font-weight:600;">{{ typeof totalDownGb === 'number' ? totalDownGb.toFixed(2) : 'N/A' }} GB</div>
         </div>
-        <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; min-width:200px;" title="Host NIC link speed, from Netdata net_speed metric (Mbps). This is interface capability, not actual throughput.">
-          <div style="font-size:12px; color:#778;">NIC Link speed</div>
+        <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff;" title="Windows WiFi adapter link speed (Mbps). This is the negotiated connection speed between your WiFi adapter and router, not your internet speed.">
+          <div style="font-size:12px; color:#778;">WiFi Link Speed</div>
           <div style="font-size:20px; font-weight:600;">{{ format3(nicSpeedMbps) }} Mbps</div>
+        </div>
+        <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; grid-column: span 2;" title="Diagnostic flags derived from recording rules for common issues">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <strong style="font-size:13px;">Diagnostics</strong>
+            <small style="color:#778; font-size:11px;">spike / micro-loss / outage / obstruction</small>
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px;">
+            <div style="display:flex; align-items:center; justify-content:center;">
+              <span :style="flagStyle(flags.latencySpike)" title="Latency spike: starlink_latency_spike > 0 indicates short-term spike vs baseline" style="font-size:11px; padding:4px 6px;">Spike</span>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:center;">
+              <span :style="flagStyle(flags.microLoss)" title="Micro‑loss: sustained 1–2% packet loss typical on Starlink" style="font-size:11px; padding:4px 6px;">Micro‑loss</span>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:center;">
+              <span :style="flagStyle(flags.outage)" title="Outage: starlink_outage_active > 0 when outage duration increases" style="font-size:11px; padding:4px 6px;">Outage</span>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:center;">
+              <span :style="flagStyle(flags.obstruction)" title="Obstruction: obstruction indicator > 0.2 over 5m" style="font-size:11px; padding:4px 6px;">Obstruct</span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
     <section style="margin-top: 24px; display:grid; grid-template-columns: 1fr; gap: 16px;">
-      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
+
+      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;" title="Down/Up Mbps (1m avg). Dashed lines show nominal (p95 over 24h). Micro-loss (%) overlaid on right axis.">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;" title="Diagnostic flags derived from recording rules for common issues">Starlink Diagnostics</h3>
-          <small style="color:#778;">spike / micro-loss / outage / obstruction</small>
+          <h3 style="margin:0;">Bandwidth (Down / Up)</h3>
+          <small style="color:#778;">starlink_down_mbps / starlink_up_mbps (recording rules)</small>
         </div>
-        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin-top:12px;">
-          <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; display:flex; align-items:center; justify-content:center;">
-            <span :style="flagStyle(flags.latencySpike)" title="Latency spike: starlink_latency_spike > 0 indicates short-term spike vs baseline">Latency spike</span>
-          </div>
-          <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; display:flex; align-items:center; justify-content:center;">
-            <span :style="flagStyle(flags.microLoss)" title="Micro‑loss: sustained 1–2% packet loss typical on Starlink">Micro‑loss</span>
-          </div>
-          <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; display:flex; align-items:center; justify-content:center;">
-            <span :style="flagStyle(flags.outage)" title="Outage: starlink_outage_active > 0 when outage duration increases">Outage active</span>
-          </div>
-          <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; display:flex; align-items:center; justify-content:center;">
-            <span :style="flagStyle(flags.obstruction)" title="Obstruction: obstruction indicator > 0.2 over 5m">Obstruction</span>
-          </div>
-        </div>
+        <div v-if="!hasBandwidthData" style="height:240px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px;">No bandwidth data in selected window</div>
+        <v-chart v-else ref="bandwidthChart" :option="bandwidthOption" autoresize style="height:240px; margin-top:8px;" @legendselectchanged="onBandwidthLegendChange" />
       </div>
 
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;" title="Latency (ms) from starlink_latency_ms; packet loss (%) overlaid from starlink_packet_loss_pct">
@@ -74,17 +95,17 @@
           </div>
           <small style="color:#778;">starlink_latency_ms (recording rule)</small>
         </div>
-        <div v-if="!hasLatencyData" style="height:240px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px;">No latency data in selected window</div>
-        <v-chart v-else :option="latencyOption" autoresize style="height:240px; margin-top:8px;" />
+        <div v-if="!hasLatencyData" style="height:180px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px;">No latency data in selected window</div>
+        <v-chart v-else :option="latencyOption" autoresize style="height:180px; margin-top:8px;" />
       </div>
 
-      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;" title="Down/Up Mbps (1m avg). Dashed lines show nominal (p95 over 24h). Micro-loss (%) overlaid on right axis.">
+      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;" title="Anomaly detection rate from Netdata ML. Shows percentage of metrics flagged as anomalous.">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">Bandwidth (Down / Up)</h3>
-          <small style="color:#778;">starlink_down_mbps / starlink_up_mbps (recording rules)</small>
+          <h3 style="margin:0;">Anomaly Detection</h3>
+          <small style="color:#778;">netdata_anomaly_detection_anomaly_rate_percentage_average</small>
         </div>
-        <div v-if="!hasBandwidthData" style="height:240px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px;">No bandwidth data in selected window</div>
-        <v-chart v-else :option="bandwidthOption" autoresize style="height:240px; margin-top:8px;" />
+        <div v-if="!hasAnomalyData" style="height:120px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px;">No anomaly data in selected window</div>
+        <v-chart v-else :option="anomalyOption" autoresize style="height:120px; margin-top:8px;" />
       </div>
 
       
@@ -167,6 +188,10 @@ const nicSpeedMbps = ref<number | 'N/A'>('N/A');
 // Initialize rangeSeconds from localStorage, default to 1 hour
 const storedRange = localStorage.getItem('levante_rangeSeconds');
 const rangeSeconds = ref<number>(storedRange ? Number(storedRange) : 3600);
+
+// Baseline traffic (Mbps) to subtract from benchmark calculations
+const baselineDownMbps = ref<number>(0.3);
+const baselineUpMbps = ref<number>(0.3);
 const rangeLabel = computed(() => (
   rangeSeconds.value === 600 ? '10 min' :
   rangeSeconds.value === 3600 ? '1 hour' :
@@ -246,14 +271,23 @@ async function computeRunMb(run: { start: number; end: number }) {
   const seconds = Math.ceil(durationMs / 1000);
   const step = 30; // seconds
   const endSec = Math.floor(run.end / 1000);
+  
+  // Query returns bytes/sec, we'll integrate over time to get total bytes
   const [downSeries, upSeries] = await Promise.all([
-    fetchRangeProm('avg_over_time(starlink_dish_downlink_throughput_bytes[1m]) * 60 / 1e6', seconds, step, endSec),
-    fetchRangeProm('avg_over_time(starlink_dish_uplink_throughput_bytes[1m]) * 60 / 1e6', seconds, step, endSec),
+    fetchRangeProm('starlink_dish_downlink_throughput_bytes', seconds, step, endSec),
+    fetchRangeProm('starlink_dish_uplink_throughput_bytes', seconds, step, endSec),
   ]);
-  const weight = step / 60; // convert MB/min to MB over step window
-  const sumWeighted = (series: Array<[number, number]>) => series.reduce((acc, [, v]) => acc + (Number(v) * weight), 0);
-  const mbDown = Number(sumWeighted(downSeries).toFixed(2));
-  const mbUp = Number(sumWeighted(upSeries).toFixed(2));
+  
+  // Integrate: sum(bytes/sec * step_seconds) / 1e6 = total MB
+  const sumBytes = (series: Array<[number, number]>) => 
+    series.reduce((acc, [, bytesPerSec]) => acc + (Number(bytesPerSec) * step), 0) / 1e6;
+  
+  // Subtract baseline traffic (baseline is in Mbps, convert to MB over duration)
+  const baselineMbDown = (baselineDownMbps.value * seconds) / 8; // Mbps * seconds / 8 = MB
+  const baselineMbUp = (baselineUpMbps.value * seconds) / 8;
+  
+  const mbDown = Math.max(0, Number((sumBytes(downSeries) - baselineMbDown).toFixed(2)));
+  const mbUp = Math.max(0, Number((sumBytes(upSeries) - baselineMbUp).toFixed(2)));
   return { mbDown, mbUp };
 }
 
@@ -362,9 +396,9 @@ async function refreshAll() {
   const totalGb = await fetchInstantProm('sum_over_time(starlink_down_mbps[1h]) * 15 / 8000');
   totalDownGb.value = typeof totalGb === 'number' && Number.isFinite(totalGb) ? totalGb : 'N/A';
 
-  // NIC link speed (Mbps): netdata_net_speed_kilobits_persec_average{dimension="speed"} / 1000
-  const nic = await fetchInstantProm('netdata_net_speed_kilobits_persec_average{dimension="speed"} / 1000');
-  nicSpeedMbps.value = typeof nic === 'number' && Number.isFinite(nic) ? nic : 'N/A';
+  // WiFi link speed (Mbps): windows_wifi_link_speed_mbps
+  const wifi = await fetchInstantProm('windows_wifi_link_speed_mbps');
+  nicSpeedMbps.value = typeof wifi === 'number' && Number.isFinite(wifi) ? wifi : 'N/A';
 
   const fixedEnd = Math.floor(Date.now() / 1000);
   const seconds = rangeSeconds.value;
@@ -387,6 +421,9 @@ async function refreshAll() {
   upMbPerMinSeries.value = upMBm;
   downMbPer10MinSeries.value = downMB10;
   upMbPer10MinSeries.value = upMB10;
+
+  // Anomaly detection
+  anomalySeries.value = await fetchRangeProm('netdata_anomaly_detection_anomaly_rate_percentage_average', seconds, step, fixedEnd);
 
   // Flags
   const [spike, microLoss, outage, obstruction] = await Promise.all([
@@ -412,6 +449,86 @@ async function refreshAll() {
     corr.value.periodic = Boolean(p.detected);
   } catch {
     corr.value = { drops: 'N/A', cpu: 'N/A', ac15: 'N/A', periodic: false };
+  }
+}
+
+async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: number) {
+  const events: Array<{ time: string; message: string; icon: string; color: string }> = [];
+  
+  try {
+    // Fetch state and obstruction data
+    const [stateSeries, obstructedSeries] = await Promise.all([
+      fetchRangeProm('starlink_dish_state', seconds, step, fixedEnd),
+      fetchRangeProm('starlink_dish_currently_obstructed', seconds, step, fixedEnd)
+    ]);
+    
+    // Detect state changes
+    const stateNames = ['Unknown', 'Booting', 'Searching', 'Connected'];
+    let lastState = -1;
+    for (const [ts, state] of stateSeries) {
+      const stateNum = Math.round(state);
+      if (lastState !== -1 && stateNum !== lastState) {
+        const stateName = stateNames[stateNum] || `State ${stateNum}`;
+        const icon = stateNum === 3 ? '✅' : stateNum === 2 ? '🔍' : stateNum === 1 ? '🔄' : '❓';
+        const color = stateNum === 3 ? '#0a7' : stateNum === 2 ? '#f90' : '#666';
+        events.push({
+          time: new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Los_Angeles',
+            month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: false
+          }).format(new Date(ts)),
+          message: `Dish state: ${stateName}`,
+          icon,
+          color
+        });
+      }
+      lastState = stateNum;
+    }
+    
+    // Detect obstruction periods
+    let inObstruction = false;
+    let obstructionStart = 0;
+    for (const [ts, obstructed] of obstructedSeries) {
+      const isObstructed = obstructed > 0;
+      if (isObstructed && !inObstruction) {
+        inObstruction = true;
+        obstructionStart = ts;
+        events.push({
+          time: new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Los_Angeles',
+            month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: false
+          }).format(new Date(ts)),
+          message: 'Obstruction detected',
+          icon: '🚫',
+          color: '#c33'
+        });
+      } else if (!isObstructed && inObstruction) {
+        inObstruction = false;
+        const durationSec = Math.round((ts - obstructionStart) / 1000);
+        events.push({
+          time: new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Los_Angeles',
+            month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: false
+          }).format(new Date(ts)),
+          message: `Obstruction cleared (${durationSec}s)`,
+          icon: '✓',
+          color: '#0a7'
+        });
+      }
+    }
+    
+    // Sort by time (newest first) and limit to last 20
+    events.sort((a, b) => {
+      const aTime = new Date(a.time).getTime();
+      const bTime = new Date(b.time).getTime();
+      return bTime - aTime;
+    });
+    starlinkEvents.value = events.slice(0, 20);
+  } catch (e) {
+    console.error('Error loading Starlink events:', e);
+    starlinkEvents.value = [];
   }
 }
 
@@ -456,10 +573,13 @@ const upMbPerMinSeries = ref<Array<[number, number]>>([]);
 const downMbPer10MinSeries = ref<Array<[number, number]>>([]);
 const upMbPer10MinSeries = ref<Array<[number, number]>>([]);
 const benchRuns = ref<Array<{ task: string; start: number; end: number }>>([]);
+const anomalySeries = ref<Array<[number, number]>>([]);
+const starlinkEvents = ref<Array<{ time: string; message: string; icon: string; color: string }>>([]);
 
 
 const hasLatencyData = computed(() => latencySeries.value.length > 0 || packetLossSeries.value.length > 0);
 const hasBandwidthData = computed(() => bandwidthDownSeries.value.length > 0 || bandwidthUpSeries.value.length > 0 || microLossSeries.value.length > 0 || downMbPerMinSeries.value.length > 0 || upMbPerMinSeries.value.length > 0 || downMbPer10MinSeries.value.length > 0 || upMbPer10MinSeries.value.length > 0);
+const hasAnomalyData = computed(() => anomalySeries.value.length > 0);
 
 const latencyOption = computed(() => {
   const now = Date.now();
@@ -469,13 +589,26 @@ const latencyOption = computed(() => {
     .flatMap(run => {
       const dMb = typeof (run as any).mbDown === 'number' ? Math.trunc((run as any).mbDown) : undefined;
       const uMb = typeof (run as any).mbUp === 'number' ? Math.trunc((run as any).mbUp) : undefined;
-      const line2 = (typeof dMb === 'number' || typeof uMb === 'number') ? `↓${dMb ?? '?'}MB ↑${uMb ?? '?'}MB` : '';
-      const endLabelFormatter = (p: any) => {
-        const t = p?.data?.task || '';
-        return line2 ? `${t}\n${line2}` : t;
-      };
       const startItem: any = { name: `${run.task} ▶`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 }, task: run.task, mbDown: dMb, mbUp: uMb, label: { show: false } };
-      const endItem: any = { name: `${run.task} ◼`, xAxis: run.end, lineStyle: { color: '#b30000', width: 2 }, task: run.task, mbDown: dMb, mbUp: uMb, label: { show: true, formatter: endLabelFormatter, lineHeight: 14 } };
+      const endItem: any = { 
+        name: `${run.task} ◼`, 
+        xAxis: run.end, 
+        lineStyle: { color: '#b30000', width: 2 }, 
+        task: run.task, 
+        mbDown: dMb, 
+        mbUp: uMb, 
+        label: { 
+          show: true, 
+          formatter: (p: any) => {
+            const t = p?.data?.task || '';
+            const d = typeof p?.data?.mbDown === 'number' ? p.data.mbDown : undefined;
+            const u = typeof p?.data?.mbUp === 'number' ? p.data.mbUp : undefined;
+            const line2 = (typeof d === 'number' || typeof u === 'number') ? `↓${d ?? '?'}MB ↑${u ?? '?'}MB` : '';
+            return line2 ? `${t}\n${line2}` : t;
+          }, 
+          lineHeight: 14 
+        } 
+      };
       return [startItem, endItem];
     });
   // Add reference line at now-5m
@@ -490,8 +623,8 @@ const latencyOption = computed(() => {
   return {
     tooltip: { trigger: 'axis' },
     grid: { left: 40, right: 80, top: 64, bottom: 40 },
-    legend: { top: 6, data: ['Latency', 'Packet Loss (%)', 'Benchmarks'] },
-  xAxis: { 
+    legend: { top: 6, data: ['Latency', 'Packet Loss (%)'] },
+    xAxis: { 
     type: 'time',
     axisLabel: {
       formatter: (value: number) => new Intl.DateTimeFormat('en-US', {
@@ -547,13 +680,26 @@ const bandwidthOption = computed(() => {
     .flatMap(run => {
       const dMb = typeof (run as any).mbDown === 'number' ? Math.trunc((run as any).mbDown) : undefined;
       const uMb = typeof (run as any).mbUp === 'number' ? Math.trunc((run as any).mbUp) : undefined;
-      const line2 = (typeof dMb === 'number' || typeof uMb === 'number') ? `↓${dMb ?? '?'}MB ↑${uMb ?? '?'}MB` : '';
-      const endLabelFormatter = (p: any) => {
-        const t = p?.data?.task || '';
-        return line2 ? `${t}\n${line2}` : t;
-      };
       const startItem: any = { name: `${run.task} ▶`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 }, task: run.task, mbDown: dMb, mbUp: uMb, label: { show: false } };
-      const endItem: any = { name: `${run.task} ◼`, xAxis: run.end, lineStyle: { color: '#b30000', width: 2 }, task: run.task, mbDown: dMb, mbUp: uMb, label: { show: true, formatter: endLabelFormatter, lineHeight: 14 } };
+      const endItem: any = { 
+        name: `${run.task} ◼`, 
+        xAxis: run.end, 
+        lineStyle: { color: '#b30000', width: 2 }, 
+        task: run.task, 
+        mbDown: dMb, 
+        mbUp: uMb, 
+        label: { 
+          show: true, 
+          formatter: (p: any) => {
+            const t = p?.data?.task || '';
+            const d = typeof p?.data?.mbDown === 'number' ? p.data.mbDown : undefined;
+            const u = typeof p?.data?.mbUp === 'number' ? p.data.mbUp : undefined;
+            const line2 = (typeof d === 'number' || typeof u === 'number') ? `↓${d ?? '?'}MB ↑${u ?? '?'}MB` : '';
+            return line2 ? `${t}\n${line2}` : t;
+          }, 
+          lineHeight: 14 
+        } 
+      };
       return [startItem, endItem];
     });
 
@@ -566,7 +712,7 @@ const bandwidthOption = computed(() => {
     grid: { left: 40, right: 80, top: 64, bottom: 40 },
     legend: { 
       top: 6, 
-      data: ['Down (Mbps)', 'Up (Mbps)', 'Down (MB/min)', 'Up (MB/min)', 'Down (MB/10m)', 'Up (MB/10m)', 'Micro-loss (%/10)', 'Benchmarks'],
+      data: ['Down (Mbps)', 'Up (Mbps)', 'Down (MB/min)', 'Up (MB/min)', 'Down (MB/10m)', 'Up (MB/10m)', 'Micro-loss (%/10)'],
       selected: legendSelected
     },
     xAxis: { 
@@ -623,6 +769,33 @@ const bandwidthOption = computed(() => {
   });
 });
 
+const anomalyOption = computed(() => ({
+  tooltip: { trigger: 'axis' },
+  grid: { left: 40, right: 40, top: 40, bottom: 40 },
+  legend: { top: 6, data: ['Anomaly Rate (%)'] },
+  xAxis: { 
+    type: 'time',
+    axisLabel: {
+      formatter: (value: number) => new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      }).format(new Date(value))
+    }
+  },
+  yAxis: { type: 'value', name: '%', min: 0, max: 100 },
+  series: [
+    { 
+      type: 'line', 
+      name: 'Anomaly Rate (%)', 
+      data: anomalySeries.value, 
+      showSymbol: false, 
+      smooth: true, 
+      lineStyle: { width: 2, color: '#ff6b6b' },
+      areaStyle: { color: 'rgba(255, 107, 107, 0.1)' }
+    }
+  ]
+}));
+
 function flagStyle(active: boolean) {
   return {
     marginTop: '8px',
@@ -647,6 +820,13 @@ function periodicityStyle(detected: boolean) {
     background: detected ? '#fff3cd' : '#f5f5f5',
     border: `1px solid ${detected ? '#ffeaa7' : '#ddd'}`
   } as const;
+}
+
+function onBandwidthLegendChange(event: any) {
+  // Save legend selection state to localStorage
+  if (event && event.selected) {
+    localStorage.setItem('levante_bandwidthLegend', JSON.stringify(event.selected));
+  }
 }
 
 // Watch rangeSeconds and save to localStorage

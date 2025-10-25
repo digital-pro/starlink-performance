@@ -225,6 +225,7 @@ async function runSpec(specFullPath, projectRoot, cypressLib) {
     String(process.env.VIDEO_COMPRESS || '').toLowerCase() === 'true' ||
     process.argv.includes('--video-compress')
   ) && wantVideo;
+  console.log(`[${task}] Video settings: video=${wantVideo ? 'ON' : 'OFF'}, compression=${wantVideoCompress ? 'ON' : 'OFF'}`);
   try {
     results = await cypressLib.run({
       project: projectRoot,
@@ -233,9 +234,16 @@ async function runSpec(specFullPath, projectRoot, cypressLib) {
       headless: true,
       spec: specFullPath,
       config: {
-        video: wantVideo, // default off; enable via VIDEO=1 or --video
-        videoCompression: wantVideoCompress ? 32 : 0, // disable compression by default (0 = off)
+        e2e: {
+          video: wantVideo ? true : false, // explicitly false by default; enable via VIDEO=1 or --video
+          videoCompression: wantVideoCompress ? 32 : 0, // disable compression by default (0 = off)
+        }
       },
+      env: {
+        // Force Cypress env vars for extra certainty
+        VIDEO: wantVideo ? 'true' : 'false',
+        VIDEO_COMPRESSION: wantVideoCompress ? '32' : '0',
+      }
     });
     const ok = results && results.totalFailed === 0 && results.status === 'finished';
     status = ok ? 'passed' : 'failed';
