@@ -68,6 +68,24 @@ PROJECT_ROOT=/home/djc/levante/core-tasks/task-launcher node run_all_and_record.
 - `cypress/timing/runs.ndjson`
   - Line‑delimited JSON; written immediately per run to minimize loss if a run crashes mid‑suite.
 
+### Dashboard Integration
+
+Benchmark runs are automatically pushed to the web dashboard for real-time visualization:
+
+- **Auto-Push**: After each task completes, `run_all_and_record.js` sends the updated `runs.json` to `/api/bench-push` (production endpoint by default)
+- **Heartbeat**: During multi-spec batches, runs are pushed every 30 seconds to keep the dashboard current
+- **Storage**: Runs are stored in Google Cloud Storage as:
+  - `benchmarks/runs.json` (canonical source)
+  - `benchmarks/latest.json` (pointer to latest batch)
+  - `benchmarks/<timestamp>.json` (timestamped snapshots)
+- **Dashboard Display**:
+  - Green vertical lines (▶) mark task start times
+  - Red vertical lines (◼) mark task end times with labels showing task name and data transferred (e.g., "↓12MB ↑3MB")
+  - Auto-refreshes every 60 seconds
+  - All timestamps displayed in Pacific Time (24-hour format)
+  - Overlays visible on both latency and bandwidth charts
+- **Deploy Control**: By default, runs are only pushed (no full Vercel deploy). Use `ALWAYS_DEPLOY=1` or `--deploy` flag to trigger a full deployment.
+
 ### Record schema (fields may expand over time)
 
 ```json
@@ -84,7 +102,11 @@ PROJECT_ROOT=/home/djc/levante/core-tasks/task-launcher node run_all_and_record.
   "realSeconds": 739.976,
   "cypressDurationMs": 721000,
   "totals": { "tests": 1, "passes": 1, "failures": 0, "pending": 0, "skipped": 0 },
-  "error": "(optional short message on error)"
+  "error": "(optional short message on error)",
+  "start": 1729745182000,
+  "end": 1729745922000,
+  "mbDown": 12.34,
+  "mbUp": 3.45
 }
 ```
 
@@ -100,8 +122,9 @@ npx webpack serve --mode development --env dbmode=development --port 8080
 
 ### Troubleshooting
 
-- If you see auth/network errors, confirm you’re running against real Firebase (no emulators) or adjust app test settings.
+- If you see auth/network errors, confirm you're running against real Firebase (no emulators) or adjust app test settings.
 - If Cypress complains about missing system libraries on Linux/WSL2, ensure the GTK/libnss deps are installed.
 - Use absolute `PROJECT_ROOT` if the runner cannot auto‑locate `task-launcher`.
+
 
 

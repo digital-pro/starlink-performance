@@ -257,5 +257,119 @@
     },
     "startPT": "18:37 PT",
     "finishPT": "18:50 PT"
+  },
+  {
+    "task": "theory-of-mind",
+    "spec": "cypress/e2e/theory_of_mind.cy.js",
+    "timestamp": "2025-10-25T01:53:41.284Z",
+    "finishedAt": "2025-10-25T02:08:08.318Z",
+    "status": "failed",
+    "real": "14m27.034s",
+    "realSeconds": 867.034,
+    "cypressDurationMs": 674422,
+    "totals": {
+      "tests": 1,
+      "passes": 1,
+      "failures": 0,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "18:53 PT",
+    "finishPT": "19:08 PT"
+  },
+  {
+    "task": "matrix-reasoning",
+    "spec": "cypress/e2e/matrix_reasoning.cy.js",
+    "timestamp": "2025-10-25T02:09:03.404Z",
+    "finishedAt": "2025-10-25T02:15:30.239Z",
+    "status": "failed",
+    "real": "6m26.835s",
+    "realSeconds": 386.835,
+    "cypressDurationMs": 247407,
+    "totals": {
+      "tests": 1,
+      "passes": 0,
+      "failures": 1,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "19:09 PT",
+    "finishPT": "19:15 PT"
+  },
+  {
+    "task": "hearts-and-flowers",
+    "spec": "cypress/e2e/hearts_and_flowers.cy.js",
+    "timestamp": "2025-10-25T02:22:33.735Z",
+    "finishedAt": "2025-10-25T02:32:54.898Z",
+    "status": "failed",
+    "real": "10m21.163s",
+    "realSeconds": 621.163,
+    "cypressDurationMs": 454616,
+    "totals": {
+      "tests": 1,
+      "passes": 1,
+      "failures": 0,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "19:22 PT",
+    "finishPT": "19:32 PT"
+  },
+  {
+    "task": "vocab",
+    "spec": "cypress/e2e/vocab_test.cy.js",
+    "timestamp": "2025-10-25T02:51:23.050Z",
+    "finishedAt": "2025-10-25T03:37:42.868Z",
+    "status": "failed",
+    "real": "46m19.818s",
+    "realSeconds": 2779.818,
+    "cypressDurationMs": 2156443,
+    "totals": {
+      "tests": 1,
+      "passes": 1,
+      "failures": 0,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "19:51 PT",
+    "finishPT": "20:37 PT"
+  },
+  {
+    "task": "theory-of-mind",
+    "spec": "cypress/e2e/theory_of_mind.cy.js",
+    "timestamp": "2025-10-25T03:54:05.747Z",
+    "finishedAt": "2025-10-25T04:06:22.956Z",
+    "status": "failed",
+    "real": "12m17.209s",
+    "realSeconds": 737.209,
+    "cypressDurationMs": 566107,
+    "totals": {
+      "tests": 1,
+      "passes": 1,
+      "failures": 0,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "20:54 PT",
+    "finishPT": "21:06 PT"
+  },
+  {
+    "task": "theory-of-mind",
+    "spec": "cypress/e2e/theory_of_mind.cy.js",
+    "timestamp": "2025-10-25T18:38:30.691Z",
+    "finishedAt": "2025-10-25T18:52:11.801Z",
+    "status": "failed",
+    "real": "13m41.110s",
+    "realSeconds": 821.11,
+    "cypressDurationMs": 656894,
+    "totals": {
+      "tests": 1,
+      "passes": 1,
+      "failures": 0,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "11:38 PT",
+    "finishPT": "11:52 PT"
   }
 ]

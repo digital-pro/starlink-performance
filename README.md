@@ -26,6 +26,41 @@ A cloud-hosted performance dashboard for Starlink, built with Vue + TypeScript a
 
 ---
 
+## Dashboard Features
+
+### Charts & Metrics
+- **Latency Chart** (240px height): Shows latency (ms) and packet loss (%) over time with benchmark run overlays
+- **Bandwidth Chart** (240px height): Displays download/upload speeds (Mbps), MB/min, MB/10min, and micro-loss (%)
+- **Time Range Selector**: Choose 10 min, 1 hour, 3 hours, 6 hours, or 12 hours (persists in localStorage)
+- **Legend Persistence**: Chart legend selections (show/hide metrics) are saved across page refreshes
+- **X-Axis Format**: Time only (HH:MM) in 24-hour Pacific Time format
+
+### Correlation Indicators (Last 15m)
+- **Latency↔Drops**: Correlation coefficient between latency and packet drops (-1 to +1). Hover for details.
+- **Latency↔CPU**: Correlation between latency and CPU usage. Positive values suggest CPU load impacts performance.
+- **15s Periodicity**: Autocorrelation analysis detects repeating ~15-second patterns in latency. Yellow (YES) indicates periodic spikes from scheduled processes, satellite beam switching, or regular interference. Gray (no) means random variations.
+
+### Diagnostic Flags
+Four real-time indicators for common Starlink issues:
+- **Latency spike**: Short-term spike vs baseline
+- **Micro-loss**: Sustained 1-2% packet loss (typical on Starlink)
+- **Outage active**: Outage duration increasing
+- **Obstruction**: Obstruction indicator > 0.2 over 5m
+
+### Benchmark Overlays
+- **Vertical markers** on charts show start (green ▶) and end (red ◼) times of Cypress benchmark runs
+- **Labels** display task name and data transferred (e.g., "↓12MB ↑3MB")
+- **Auto-refresh**: Benchmark data refreshes every 60 seconds
+- **Timestamps**: All times displayed in Pacific Time (24-hour format)
+
+### Packet Loss Details Modal
+Click "Packet loss details" button to see:
+- Current loss percentage
+- Max/Avg over 5m, 15m, and 1h windows
+- Time with loss > 0% (15m)
+
+---
+
 ## Prerequisites
 
 - Node.js 18+

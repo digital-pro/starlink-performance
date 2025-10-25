@@ -12,6 +12,7 @@ const __dirname = path.dirname(__filename);
 const timingDir = path.join(__dirname);
 const runsJsonPath = path.join(timingDir, 'runs.json');
 const runsNdjsonPath = path.join(timingDir, 'runs.ndjson');
+const DEFAULT_PUSH_URL = process.env.DASHBOARD_PUSH_URL || 'https://levante-performance-digitalpros-projects.vercel.app/api/bench-push';
 
 async function pathExists(p) {
   try {
@@ -168,8 +169,7 @@ async function appendRunRecord(record) {
   await writeJsonArray(runsJsonPath, arr);
   // Push to dashboard for live overlays (best-effort)
   try {
-    const url = process.env.DASHBOARD_PUSH_URL || 'http://localhost:3000/api/bench-push';
-    await fetch(url, {
+    await fetch(DEFAULT_PUSH_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(arr)
@@ -177,6 +177,17 @@ async function appendRunRecord(record) {
   } catch {}
   // Deploy and alias by default unless disabled
   await maybeDeploy();
+}
+
+async function pushAllRunsNow() {
+  try {
+    const arr = await readJsonArray(runsJsonPath);
+    await fetch(DEFAULT_PUSH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(arr)
+    }).catch(() => {});
+  } catch {}
 }
 
 async function maybeDeploy() {
@@ -223,7 +234,7 @@ async function runSpec(specFullPath, projectRoot, cypressLib) {
       spec: specFullPath,
       config: {
         video: wantVideo, // default off; enable via VIDEO=1 or --video
-        videoCompression: wantVideoCompress ? 32 : false, // disable compression by default
+        videoCompression: wantVideoCompress ? 32 : 0, // disable compression by default (0 = off)
       },
     });
     const ok = results && results.totalFailed === 0 && results.status === 'finished';
@@ -293,10 +304,16 @@ async function main() {
 
   if (targetSpecs.length === 0) {
     console.log('No Cypress specs found.');
+    await pushAllRunsNow();
     return;
   }
 
   console.log(`Found ${targetSpecs.length} specs.`);
+  // Heartbeat: push latest runs every 30s during long batches
+  let hb;
+  if (targetSpecs.length > 1) {
+    hb = setInterval(() => { pushAllRunsNow(); }, 30000);
+  }
   for (const spec of targetSpecs) {
     console.log(`\n>>> Running: ${path.relative(projectRoot, spec)}`);
     try {
@@ -307,6 +324,8 @@ async function main() {
       // continue to next spec
     }
   }
+  if (hb) clearInterval(hb);
+  await pushAllRunsNow();
   console.log('\nAll done. Results appended to cypress/timing/runs.json');
 }
 

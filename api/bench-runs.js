@@ -17,16 +17,17 @@ async function readFromGCS() {
     const bucketName = process.env.GCP_BUCKET_NAME || 'levante-performance-dev';
     const storage = getStorage();
     const bucket = storage.bucket(bucketName);
-    // Prefer a stable pointer first
-    const latestPtr = bucket.file('benchmarks/latest.json');
-    const [exists] = await latestPtr.exists();
-    if (exists) {
-      const [content] = await latestPtr.download();
-      const data = JSON.parse(content.toString());
-      return Array.isArray(data?.runs) ? data.runs : [];
+    // Prefer a canonical runs.json
+    for (const name of ['benchmarks/runs.json', 'benchmarks/latest.json']) {
+      const f = bucket.file(name);
+      const [exists] = await f.exists();
+      if (exists) {
+        const [content] = await f.download();
+        const data = JSON.parse(content.toString());
+        return Array.isArray(data?.runs) ? data.runs : [];
+      }
     }
-
-    // Fallback: list timestamped files and pick newest
+    // Fallback: newest timestamped file
     const [files] = await bucket.getFiles({ prefix: 'benchmarks/' });
     if (files.length === 0) return [];
     const sortedFiles = files
@@ -54,7 +55,7 @@ async function readMergedRecentFromGCS(maxFiles = 100) {
     const [files] = await bucket.getFiles({ prefix: 'benchmarks/' });
     const candidates = files
       .map(f => f.name)
-      .filter(n => n.endsWith('.json') && n !== 'benchmarks/latest.json');
+      .filter(n => n.endsWith('.json') && !n.endsWith('runs.json') && !n.endsWith('latest.json'));
     if (candidates.length === 0) return [];
     const sorted = candidates.sort((a, b) => {
       const aTime = parseInt(a.split('/')[1]?.split('.')[0] || '0');
@@ -90,10 +91,10 @@ export default async function handler(req, res) {
     const mem = globalThis.__BENCH_RUNS_CACHE__;
     let arr = Array.isArray(mem) ? mem : null;
     
-    // Else read merged recent files from Google Cloud Storage
-    if (!arr) arr = await readMergedRecentFromGCS(150);
-    // Fallback to pointer/newest single file
+    // Else read from Google Cloud Storage
     if (!arr || arr.length === 0) arr = await readFromGCS();
+    // Fallback: merge several of the most recent files
+    if (!arr || arr.length === 0) arr = await readMergedRecentFromGCS(150);
 
     const items = (Array.isArray(arr) ? arr : []).map(r => ({
       task: r.task || 'unknown',

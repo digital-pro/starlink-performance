@@ -6,10 +6,7 @@ function getStorage() {
     throw new Error('GCP_SERVICE_ACCOUNT_KEY environment variable not set');
   }
   const credentials = JSON.parse(keyJson);
-  return new Storage({
-    projectId: credentials.project_id,
-    credentials
-  });
+  return new Storage({ projectId: credentials.project_id, credentials });
 }
 
 export default async function handler(req, res) {
@@ -23,7 +20,6 @@ export default async function handler(req, res) {
       res.status(400).json({ error: 'Expected JSON array of runs' });
       return;
     }
-    
     // Basic schema normalization
     const safe = body.map(r => ({
       task: String(r.task || 'unknown'),
@@ -38,35 +34,25 @@ export default async function handler(req, res) {
     const bucket = storage.bucket(bucketName);
     const timestamp = Date.now();
     const filename = `benchmarks/${timestamp}.json`;
-    
-    await bucket.file(filename).save(JSON.stringify({
+
+    const payload = JSON.stringify({
       timestamp: new Date().toISOString(),
       runs: safe
-    }, null, 2), {
+    }, null, 2);
+
+    await bucket.file(filename).save(payload, {
       contentType: 'application/json',
-      metadata: {
-        uploadedAt: new Date().toISOString()
-      }
+      metadata: { uploadedAt: new Date().toISOString() }
     });
 
-    // Also write/update stable pointer for freshest reads
-    try {
-      await bucket.file('benchmarks/latest.json').save(JSON.stringify({
-        timestamp: new Date().toISOString(),
-        runs: safe
-      }, null, 2), {
-        contentType: 'application/json'
-      });
-    } catch {}
+    // Update stable pointers
+    await bucket.file('benchmarks/latest.json').save(payload, { contentType: 'application/json' });
+    await bucket.file('benchmarks/runs.json').save(payload, { contentType: 'application/json' });
 
     // Also keep in memory for immediate reads
     globalThis.__BENCH_RUNS_CACHE__ = safe;
-    
-    res.status(200).json({ 
-      ok: true, 
-      count: safe.length,
-      stored: filename
-    });
+
+    res.status(200).json({ ok: true, count: safe.length, stored: filename });
   } catch (e) {
     res.status(500).json({ error: 'server_error', detail: String(e?.message || e) });
   }
