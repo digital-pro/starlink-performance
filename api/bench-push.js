@@ -49,6 +49,16 @@ export default async function handler(req, res) {
       }
     });
 
+    // Also write/update stable pointer for freshest reads
+    try {
+      await bucket.file('benchmarks/latest.json').save(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        runs: safe
+      }, null, 2), {
+        contentType: 'application/json'
+      });
+    } catch {}
+
     // Also keep in memory for immediate reads
     globalThis.__BENCH_RUNS_CACHE__ = safe;
     

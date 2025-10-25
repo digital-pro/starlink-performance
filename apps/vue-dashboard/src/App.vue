@@ -138,10 +138,10 @@ import axios from 'axios';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart } from 'echarts/charts';
-import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components';
+import { GridComponent, TooltipComponent, LegendComponent, MarkLineComponent } from 'echarts/components';
 import VChart from 'vue-echarts';
 
-use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, LegendComponent]);
+use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, LegendComponent, MarkLineComponent]);
 
 const metrics = ref<Record<string, number | string>>({
   latency: 'N/A',
@@ -297,6 +297,93 @@ async function fetchRangeProm(query: string, seconds = 600, step = 10, fixedEnd?
   }
 }
 
+async function computeRunMb(run: { start: number; end: number }) {
+  const durationMs = Math.max(0, (run.end || 0) - (run.start || 0));
+  if (durationMs <= 0) return { mbDown: 0, mbUp: 0 };
+  const seconds = Math.ceil(durationMs / 1000);
+  const step = 30; // seconds
+  const endSec = Math.floor(run.end / 1000);
+  const [downSeries, upSeries] = await Promise.all([
+    fetchRangeProm('avg_over_time(starlink_dish_downlink_throughput_bytes[1m]) * 60 / 1e6', seconds, step, endSec),
+    fetchRangeProm('avg_over_time(starlink_dish_uplink_throughput_bytes[1m]) * 60 / 1e6', seconds, step, endSec),
+  ]);
+  const weight = step / 60; // convert MB/min to MB over step window
+  const sumWeighted = (series: Array<[number, number]>) => series.reduce((acc, [, v]) => acc + (Number(v) * weight), 0);
+  const mbDown = Number(sumWeighted(downSeries).toFixed(2));
+  const mbUp = Number(sumWeighted(upSeries).toFixed(2));
+  return { mbDown, mbUp };
+}
+
+async function enrichVisibleRunsWithMb() {
+  const now = Date.now();
+  const windowStart = now - (rangeSeconds.value * 1000);
+  const visible = benchRuns.value.filter(r => r.end >= windowStart && r.start <= now);
+  await Promise.all(visible.map(async (r) => {
+    if (typeof (r as any).mbDown === 'number' && typeof (r as any).mbUp === 'number') return;
+    try {
+      const { mbDown, mbUp } = await computeRunMb(r);
+      (r as any).mbDown = mbDown;
+      (r as any).mbUp = mbUp;
+    } catch {}
+  }));
+  // nudge reactivity
+  benchRuns.value = benchRuns.value.slice();
+}
+
+// Fetch latest benchmark runs for overlay mark lines
+async function loadBenchRuns() {
+  try {
+    const r = await axios.get('/api/bench-runs', { params: { t: Date.now() } });
+    const arr = Array.isArray(r.data?.runs) ? r.data.runs : [];
+    // Normalize to ms epoch; some sources may provide seconds
+    const normalized = arr.map((run: any) => {
+      let s = Number(run.start);
+      let e = Number(run.end);
+      if (Number.isFinite(s) && s < 1e12) s = s * 1000; // seconds → ms
+      if (Number.isFinite(e) && e < 1e12) e = e * 1000;
+      const mbDown = typeof run.mbDown === 'number' ? run.mbDown : undefined;
+      const mbUp = typeof run.mbUp === 'number' ? run.mbUp : undefined;
+      return { task: String(run.task || 'run'), start: s, end: e, mbDown, mbUp };
+    }).filter((x: any) => Number.isFinite(x.start) && Number.isFinite(x.end));
+    // Deduplicate and sort by start
+    const seen = new Set<string>();
+    const uniq = normalized.filter((x: any) => {
+      const key = `${x.task}:${x.start}:${x.end}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).sort((a: any, b: any) => a.start - b.start);
+    benchRuns.value = uniq;
+
+    // Debug: print PT time for each mark line and whether it's in current range
+    try {
+      const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles', year: '2-digit', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      });
+      const now = Date.now();
+      const startWindow = now - (rangeSeconds.value * 1000);
+      const startPT = fmt.format(new Date(startWindow));
+      const endPT = fmt.format(new Date(now));
+      console.groupCollapsed(`📊 Benchmark runs (${uniq.length})`);
+      console.log(`🕘 X-axis PT window: start=${startPT}, end=${endPT}`);
+      for (const run of uniq) {
+        const sPT = fmt.format(new Date(run.start));
+        const ePT = fmt.format(new Date(run.end));
+        const inWindow = run.end >= startWindow && run.start <= now;
+        const icon = inWindow ? '🟢' : '🔴';
+        console.log(`${icon} ${run.task}: start=${run.start}ms (${sPT} PT), end=${run.end}ms (${ePT} PT), inWindow=${inWindow}`);
+      }
+      console.groupEnd();
+    } catch {}
+
+    // Compute MB for visible runs (non-blocking)
+    enrichVisibleRunsWithMb();
+  } catch {
+    benchRuns.value = [];
+  }
+}
+
 async function refreshAll() {
   // Fetch benchmark runs for vertical line markers
   try {
@@ -432,21 +519,35 @@ const hasLatencyData = computed(() => latencySeries.value.length > 0 || packetLo
 const hasBandwidthData = computed(() => bandwidthDownSeries.value.length > 0 || bandwidthUpSeries.value.length > 0 || microLossSeries.value.length > 0 || downMbPerMinSeries.value.length > 0 || upMbPerMinSeries.value.length > 0 || downMbPer10MinSeries.value.length > 0 || upMbPer10MinSeries.value.length > 0);
 
 const latencyOption = computed(() => {
-  const markLineData = benchRuns.value.flatMap(run => ([
-    { name: `${run.task} ▶`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 } },
-    { name: `${run.task} ◼`, xAxis: run.end, lineStyle: { color: '#b30000', width: 2 } }
-  ]));
-  
+  const now = Date.now();
+  const windowStart = now - (rangeSeconds.value * 1000);
+  const markLineData = benchRuns.value
+    .filter(run => run.end >= windowStart && run.start <= now)
+    .flatMap(run => ([
+      { name: `${run.task} ▶`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 }, task: run.task, durationLabel: '', mbDown: (run as any).mbDown, mbUp: (run as any).mbUp },
+      { name: `${run.task} ◼`, xAxis: run.end, lineStyle: { color: '#b30000', width: 2 }, task: run.task, durationLabel: '', mbDown: (run as any).mbDown, mbUp: (run as any).mbUp }
+    ]));
+  // Add reference line at now-5m
+  markLineData.unshift({ name: 'T-5m', xAxis: now - 5*60*1000, lineStyle: { color: '#1273EB', width: 4, opacity: 0.5 } });
+
   console.log('📈 Latency markLine data:', { 
     benchRunsCount: benchRuns.value.length, 
     markLineData,
     benchRuns: benchRuns.value 
   });
-  
+
   return {
     tooltip: { trigger: 'axis' },
-    grid: { left: 40, right: 80, top: 24, bottom: 40 },
-    xAxis: { type: 'time' },
+    grid: { left: 40, right: 80, top: 64, bottom: 40 },
+  xAxis: { 
+    type: 'time',
+    axisLabel: {
+      formatter: (value: number) => new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Los_Angeles', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      }).format(new Date(value))
+    }
+  },
     yAxis: [
       { type: 'value', name: 'ms' },
       { type: 'value', name: '%', position: 'right' }
@@ -460,10 +561,36 @@ const latencyOption = computed(() => {
         smooth: true, 
         lineStyle: { width: 2 }, 
         yAxisIndex: 0,
-        markLine: benchRuns.value.length > 0 ? {
+      markLine: markLineData.length > 0 ? {
           symbol: ['none','none'],
           label: { show: true, formatter: (p) => (p?.name || ''), fontSize: 10 },
+          tooltip: { show: true, formatter: (p) => {
+            const t = p?.data?.task || p?.name || '';
+            const d = p?.data?.durationLabel ? ` (${p.data.durationLabel})` : '';
+            const dMb = typeof p?.data?.mbDown === 'number' ? ` | ↓ ${p.data.mbDown} MB` : '';
+            const uMb = typeof p?.data?.mbUp === 'number' ? ` | ↑ ${p.data.mbUp} MB` : '';
+            return `${t}${d}${dMb}${uMb}`;
+          } },
           data: markLineData
+      } : undefined
+      },
+      // Invisible series to force markLine rendering even if main series is empty
+      {
+        type: 'line', name: 'Benchmarks', data: [], showSymbol: false, xAxisIndex: 0, yAxisIndex: 0,
+        lineStyle: { width: 0, opacity: 0 },
+        markLine: markLineData.length > 0 ? {
+          symbol: ['none','none'],
+          label: { show: true, formatter: (p) => (p?.name || ''), fontSize: 10 },
+          tooltip: { show: true, formatter: (p) => {
+            const t = p?.data?.task || p?.name || '';
+            const d = p?.data?.durationLabel ? ` (${p.data.durationLabel})` : '';
+            const dMb = typeof p?.data?.mbDown === 'number' ? ` | ↓ ${p.data.mbDown} MB` : '';
+            const uMb = typeof p?.data?.mbUp === 'number' ? ` | ↑ ${p.data.mbUp} MB` : '';
+            return `${t}${d}${dMb}${uMb}`;
+          } },
+          data: markLineData,
+          emphasis: { lineStyle: { width: 2 } },
+          silent: true
         } : undefined
       },
       { type: 'line', name: 'Packet Loss (%)', data: packetLossSeries?.value || [], showSymbol: false, lineStyle: { width: 2, type: 'dashed' }, yAxisIndex: 1 }
@@ -471,42 +598,73 @@ const latencyOption = computed(() => {
   };
 });
 
-const bandwidthOption = computed(() => ({
-  tooltip: { trigger: 'axis' },
-  grid: { left: 40, right: 16, top: 24, bottom: 40 },
-  xAxis: { type: 'time' },
-  yAxis: [
-    { type: 'value', name: 'Mbps' },
-    { type: 'value', name: 'MB/min', position: 'right', offset: 0 },
-    { type: 'value', name: '%', position: 'right', offset: 48 }
-  ],
-  legend: { data: ['Down (Mbps)', 'Up (Mbps)', 'Down (MB/min)', 'Up (MB/min)', 'Down (MB/10m)', 'Up (MB/10m)', 'Micro-loss (%)'] },
-  series: [
-    { 
-      type: 'line', 
-      name: 'Down (Mbps)', 
-      data: bandwidthDownSeries.value, 
-      showSymbol: false, 
-      smooth: true, 
-      yAxisIndex: 0, 
-      lineStyle: { width: 2 },
-      markLine: benchRuns.value.length > 0 ? {
-        symbol: ['none','none'],
-        label: { show: true, formatter: (p) => (p?.name || ''), fontSize: 10 },
-        data: benchRuns.value.flatMap(run => ([
-          { name: `${run.task} ▶`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 } },
-          { name: `${run.task} ◼`, xAxis: run.end, lineStyle: { color: '#b30000', width: 2 } }
-        ]))
-      } : undefined
+const bandwidthOption = computed(() => {
+  const now = Date.now();
+  const windowStart = now - (rangeSeconds.value * 1000);
+  const markLineData = benchRuns.value
+    .filter(run => run.end >= windowStart && run.start <= now)
+    .flatMap(run => ([
+      { name: `${run.task} ▶`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 }, task: run.task, durationLabel: '', mbDown: (run as any).mbDown, mbUp: (run as any).mbUp },
+      { name: `${run.task} ◼`, xAxis: run.end, lineStyle: { color: '#b30000', width: 2 }, task: run.task, durationLabel: '', mbDown: (run as any).mbDown, mbUp: (run as any).mbUp }
+    ]));
+
+  return ({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 40, right: 16, top: 72, bottom: 40 },
+    xAxis: { 
+      type: 'time',
+      axisLabel: {
+        formatter: (value: number) => new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Los_Angeles', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', hour12: false
+        }).format(new Date(value))
+      }
     },
-    { type: 'line', name: 'Up (Mbps)', data: bandwidthUpSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 2 } },
-    { type: 'line', name: 'Down (MB/min)', data: downMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5, type: 'dotted' } },
-    { type: 'line', name: 'Up (MB/min)', data: upMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5, type: 'dotted' } },
-    { type: 'line', name: 'Down (MB/10m)', data: downMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5 } },
-    { type: 'line', name: 'Up (MB/10m)', data: upMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5 } },
-    { type: 'line', name: 'Micro-loss (%)', data: microLossSeries.value, showSymbol: false, yAxisIndex: 1, lineStyle: { type: 'dashed', width: 2 } }
-  ]
-}));
+    yAxis: [
+      { type: 'value', name: 'Mbps' },
+      { type: 'value', name: 'MB/min', position: 'right', offset: 0 },
+      { type: 'value', name: '%', position: 'right', offset: 48 }
+    ],
+    legend: { top: 6, data: ['Down (Mbps)', 'Up (Mbps)', 'Down (MB/min)', 'Up (MB/min)', 'Down (MB/10m)', 'Up (MB/10m)', 'Micro-loss (%/10)'] },
+    series: [
+      { 
+        type: 'line', 
+        name: 'Down (Mbps)', 
+        data: bandwidthDownSeries.value, 
+        showSymbol: false, 
+        smooth: true, 
+        yAxisIndex: 0, 
+        lineStyle: { width: 2 },
+        // keep only data line here; use dedicated invisible series for mark lines
+      },
+      { type: 'line', name: 'Up (Mbps)', data: bandwidthUpSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 2 } },
+      { type: 'line', name: 'Down (MB/min)', data: downMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5, type: 'dotted' } },
+      { type: 'line', name: 'Up (MB/min)', data: upMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5, type: 'dotted' } },
+      { type: 'line', name: 'Down (MB/10m)', data: downMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5 } },
+      { type: 'line', name: 'Up (MB/10m)', data: upMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5 } },
+      { type: 'line', name: 'Micro-loss (%/10)', data: microLossSeries.value, showSymbol: false, yAxisIndex: 1, lineStyle: { type: 'dashed', width: 2 } },
+      // Invisible series to force markLine rendering (always present)
+      {
+        type: 'line', name: 'Benchmarks', data: [], showSymbol: false, xAxisIndex: 0, yAxisIndex: 0,
+        lineStyle: { width: 0, opacity: 0 },
+        markLine: [{ name: 'T-5m', xAxis: now - 5*60*1000, lineStyle: { color: '#1273EB', width: 4, opacity: 0.5 } }].concat(markLineData).length > 0 ? {
+          symbol: ['none','none'],
+          label: { show: true, formatter: (p) => (p?.name || ''), fontSize: 10 },
+          tooltip: { show: true, formatter: (p) => {
+            const t = p?.data?.task || p?.name || '';
+            const d = p?.data?.durationLabel ? ` (${p.data.durationLabel})` : '';
+            const dMb = typeof p?.data?.mbDown === 'number' ? ` | ↓ ${p.data.mbDown} MB` : '';
+            const uMb = typeof p?.data?.mbUp === 'number' ? ` | ↑ ${p.data.mbUp} MB` : '';
+            return `${t}${d}${dMb}${uMb}`;
+          } },
+          data: [{ name: 'T-5m', xAxis: now - 5*60*1000, lineStyle: { color: '#1273EB', width: 4, opacity: 0.5 } }].concat(markLineData),
+          emphasis: { lineStyle: { width: 2 } },
+          silent: true
+        } : undefined
+      }
+    ]
+  });
+});
 
 function flagStyle(active: boolean) {
   return {
@@ -523,6 +681,9 @@ function flagStyle(active: boolean) {
 
 onMounted(() => {
   refreshAll();
+  loadBenchRuns();
+  // Refresh benchmark overlays every 30s without reloading full series
+  setInterval(() => { loadBenchRuns(); }, 30000);
 });
 </script>
 

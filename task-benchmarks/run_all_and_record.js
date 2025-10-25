@@ -209,6 +209,11 @@ async function runSpec(specFullPath, projectRoot, cypressLib) {
     String(process.env.VIDEO || '').toLowerCase() === 'true' ||
     process.argv.includes('--video')
   );
+  const wantVideoCompress = (
+    String(process.env.VIDEO_COMPRESS || '').toLowerCase() === '1' ||
+    String(process.env.VIDEO_COMPRESS || '').toLowerCase() === 'true' ||
+    process.argv.includes('--video-compress')
+  ) && wantVideo;
   try {
     results = await cypressLib.run({
       project: projectRoot,
@@ -218,6 +223,7 @@ async function runSpec(specFullPath, projectRoot, cypressLib) {
       spec: specFullPath,
       config: {
         video: wantVideo, // default off; enable via VIDEO=1 or --video
+        videoCompression: wantVideoCompress ? 32 : false, // disable compression by default
       },
     });
     const ok = results && results.totalFailed === 0 && results.status === 'finished';
@@ -269,11 +275,21 @@ async function main() {
   const projectRoot = await resolveProjectRoot();
   const specsDir = path.join(projectRoot, 'cypress', 'e2e');
   const allSpecs = await collectSpecs(specsDir);
+  console.log(`[bench] Discovered ${allSpecs.length} spec files under ${specsDir}`);
   const cypressLib = await loadCypressFromProject(projectRoot);
 
-  const targetSpecs = only
-    ? allSpecs.filter((p) => p.includes(only))
-    : allSpecs;
+  const targetSpecs = (function() {
+    if (!only) return allSpecs;
+    const normalize = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const needle = normalize(only);
+    const matched = allSpecs.filter((p) => {
+      const base = path.basename(p).replace(/\.cy\.(js|ts)$/i, '');
+      const hay = normalize(base);
+      return hay.includes(needle);
+    });
+    console.log(`[bench] Filter '${only}' matched ${matched.length} specs.`);
+    return matched;
+  })();
 
   if (targetSpecs.length === 0) {
     console.log('No Cypress specs found.');
