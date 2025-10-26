@@ -78,7 +78,7 @@ fi
 # Generate config
 cat > "$CONF" <<YAML
 global:
-  scrape_interval: 30s
+  scrape_interval: 10s
 
 rule_files:
   - ${ROOT_DIR}/deployment/rules/*.yml

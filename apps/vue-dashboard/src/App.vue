@@ -6,7 +6,6 @@
         <small>Data Source: Prometheus (Grafana Cloud)</small>
         <a href="https://levanteperformance.grafana.net/d/ab8a8fa9-8d9c-47df-928b-9db5a89a5bca/starlink-performance-10-25?orgId=1&from=now-6h&to=now&timezone=browser&refresh=30s&showCategory=Panel%20options" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #444; background:#222; color:white; border-radius:8px; text-decoration:none;">Open in Grafana</a>
         <a href="https://levanteperformance.grafana.net/public-dashboards/ec38f814efb64ce6a2d1d4b7977cc83e?from=now-6h&to=now&timezone=browser" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #666; background:#444; color:white; border-radius:8px; text-decoration:none;">Public view</a>
-        <button @click="refreshAll" style="padding:8px 12px; border:1px solid #08c; background:#08c; color:white; border-radius:8px; cursor:pointer;">Refresh</button>
       </div>
     </header>
 
@@ -24,6 +23,7 @@
           <option :value="21600">Last 6 hours</option>
           <option :value="43200">Last 12 hours</option>
         </select>
+        <button @click="refreshAll" style="padding:6px 10px; border:1px solid #08c; background:#08c; color:white; border-radius:6px; cursor:pointer; font-size:12px;">Refresh</button>
         <span style="margin-left:16px; display:flex; align-items:center; gap:8px;">
           <label style="display:flex; align-items:center; gap:4px;">
             <span style="font-size:12px;">Baseline Down:</span>
@@ -78,7 +78,7 @@
 
     <section style="margin-top: 24px; display:grid; grid-template-columns: 1fr; gap: 16px;">
 
-      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;" title="Down/Up Mbps (1m avg). Dashed lines show nominal (p95 over 24h). Micro-loss (%) overlaid on right axis.">
+      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Bandwidth (Down / Up)</h3>
           <small style="color:#778;">starlink_down_mbps / starlink_up_mbps (recording rules)</small>
@@ -99,12 +99,12 @@
         <v-chart v-else :option="latencyOption" autoresize style="height:180px; margin-top:8px;" />
       </div>
 
-      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;" title="Anomaly detection rate from Netdata ML. Shows percentage of metrics flagged as anomalous.">
+      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;" title="Anomaly detection rate and Starlink events overlay">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">Anomaly Detection</h3>
-          <small style="color:#778;">netdata_anomaly_detection_anomaly_rate_percentage_average</small>
+          <h3 style="margin:0;">Anomaly Detection & Starlink Events</h3>
+          <small style="color:#778;">netdata anomaly rate + state changes</small>
         </div>
-        <div v-if="!hasAnomalyData" style="height:120px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px;">No anomaly data in selected window</div>
+        <div v-if="!hasAnomalyData && starlinkEvents.length === 0" style="height:120px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px;">No data in selected window</div>
         <v-chart v-else :option="anomalyOption" autoresize style="height:120px; margin-top:8px;" />
       </div>
 
@@ -273,21 +273,60 @@ async function computeRunMb(run: { start: number; end: number }) {
   const endSec = Math.floor(run.end / 1000);
   
   // Query returns bytes/sec, we'll integrate over time to get total bytes
+  // 
+  // ⚠️ CRITICAL: DO NOT SWAP THESE METRICS! ⚠️
+  // Starlink uses DISH perspective (opposite of user perspective):
+  //   - starlink_dish_downlink_throughput_bytes = satellite→dish = USER DOWNLOAD
+  //   - starlink_dish_uplink_throughput_bytes = dish→satellite = USER UPLOAD
+  // This has been incorrectly swapped multiple times. The mapping below is CORRECT.
   const [downSeries, upSeries] = await Promise.all([
-    fetchRangeProm('starlink_dish_downlink_throughput_bytes', seconds, step, endSec),
-    fetchRangeProm('starlink_dish_uplink_throughput_bytes', seconds, step, endSec),
+    fetchRangeProm('starlink_dish_downlink_throughput_bytes', seconds, step, endSec),  // USER DOWNLOAD (satellite→dish)
+    fetchRangeProm('starlink_dish_uplink_throughput_bytes', seconds, step, endSec),    // USER UPLOAD (dish→satellite)
   ]);
   
   // Integrate: sum(bytes/sec * step_seconds) / 1e6 = total MB
   const sumBytes = (series: Array<[number, number]>) => 
     series.reduce((acc, [, bytesPerSec]) => acc + (Number(bytesPerSec) * step), 0) / 1e6;
   
+  // Sanity check: Compare integration with simple start/end difference
+  const getStartEndDiff = (series: Array<[number, number]>) => {
+    if (series.length < 2) return 0;
+    const first = series[0][1];
+    const last = series[series.length - 1][1];
+    // Average throughput * duration
+    return ((first + last) / 2) * seconds / 1e6;
+  };
+  
+  const integratedDown = sumBytes(downSeries);
+  const integratedUp = sumBytes(upSeries);
+  const startEndDown = getStartEndDiff(downSeries);
+  const startEndUp = getStartEndDiff(upSeries);
+  
+  // If integration differs from start/end by >30%, use start/end method
+  const downDiffPct = Math.abs(integratedDown - startEndDown) / Math.max(integratedDown, startEndDown, 1);
+  const upDiffPct = Math.abs(integratedUp - startEndUp) / Math.max(integratedUp, startEndUp, 1);
+  
+  let rawDown = integratedDown;
+  let rawUp = integratedUp;
+  
+  if (downDiffPct > 0.3) {
+    console.warn(`⚠️ Download sanity check failed: integrated=${integratedDown.toFixed(1)}MB vs start/end=${startEndDown.toFixed(1)}MB (${(downDiffPct*100).toFixed(0)}% diff) - using start/end`);
+    rawDown = startEndDown;
+  }
+  if (upDiffPct > 0.3) {
+    console.warn(`⚠️ Upload sanity check failed: integrated=${integratedUp.toFixed(1)}MB vs start/end=${startEndUp.toFixed(1)}MB (${(upDiffPct*100).toFixed(0)}% diff) - using start/end`);
+    rawUp = startEndUp;
+  }
+  
   // Subtract baseline traffic (baseline is in Mbps, convert to MB over duration)
   const baselineMbDown = (baselineDownMbps.value * seconds) / 8; // Mbps * seconds / 8 = MB
   const baselineMbUp = (baselineUpMbps.value * seconds) / 8;
   
-  const mbDown = Math.max(0, Number((sumBytes(downSeries) - baselineMbDown).toFixed(2)));
-  const mbUp = Math.max(0, Number((sumBytes(upSeries) - baselineMbUp).toFixed(2)));
+  const mbDown = Math.max(0, Number((rawDown - baselineMbDown).toFixed(2)));
+  const mbUp = Math.max(0, Number((rawUp - baselineMbUp).toFixed(2)));
+  
+  console.log(`📊 MB calc for ${seconds}s: Down ${rawDown.toFixed(2)}MB - ${baselineMbDown.toFixed(2)}MB baseline = ${mbDown}MB | Up ${rawUp.toFixed(2)}MB - ${baselineMbUp.toFixed(2)}MB baseline = ${mbUp}MB`);
+  
   return { mbDown, mbUp };
 }
 
@@ -369,6 +408,8 @@ async function refreshAll() {
     if (runsRes.data?.ok && Array.isArray(runsRes.data.runs)) {
       benchRuns.value = runsRes.data.runs;
       console.log(`✅ Loaded ${benchRuns.value.length} benchmark runs:`, benchRuns.value);
+      // Enrich visible runs with MB calculations
+      await enrichVisibleRunsWithMb();
     }
   } catch (e) {
     console.error('❌ Could not fetch benchmark runs:', e);
@@ -424,6 +465,7 @@ async function refreshAll() {
 
   // Anomaly detection
   anomalySeries.value = await fetchRangeProm('netdata_anomaly_detection_anomaly_rate_percentage_average', seconds, step, fixedEnd);
+  console.log(`📊 Anomaly series: ${anomalySeries.value.length} data points`);
 
   // Flags
   const [spike, microLoss, outage, obstruction] = await Promise.all([
@@ -450,56 +492,91 @@ async function refreshAll() {
   } catch {
     corr.value = { drops: 'N/A', cpu: 'N/A', ac15: 'N/A', periodic: false };
   }
+
+  // Starlink Events: detect state changes and obstructions
+  await loadStarlinkEvents(seconds, step, fixedEnd);
 }
 
 async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: number) {
-  const events: Array<{ time: string; message: string; icon: string; color: string }> = [];
+  const events: Array<{ time: string; timestamp: number; message: string; icon: string; color: string }> = [];
   
   try {
-    // Fetch state and obstruction data
-    const [stateSeries, obstructedSeries] = await Promise.all([
-      fetchRangeProm('starlink_dish_state', seconds, step, fixedEnd),
-      fetchRangeProm('starlink_dish_currently_obstructed', seconds, step, fixedEnd)
+    // Fetch metrics for smart event detection
+    const [downThroughput, upThroughput, obstructionFraction, packetLoss, latency] = await Promise.all([
+      fetchRangeProm('starlink_dish_uplink_throughput_bytes', seconds, step, fixedEnd),      // User download
+      fetchRangeProm('starlink_dish_downlink_throughput_bytes', seconds, step, fixedEnd),    // User upload
+      fetchRangeProm('starlink_dish_fraction_obstruction_ratio', seconds, step, fixedEnd),
+      fetchRangeProm('starlink_dish_pop_ping_drop_ratio', seconds, step, fixedEnd),
+      fetchRangeProm('starlink_dish_pop_ping_latency_seconds', seconds, step, fixedEnd)
     ]);
     
-    // Detect state changes
-    const stateNames = ['Unknown', 'Booting', 'Searching', 'Connected'];
-    let lastState = -1;
-    for (const [ts, state] of stateSeries) {
-      const stateNum = Math.round(state);
-      if (lastState !== -1 && stateNum !== lastState) {
-        const stateName = stateNames[stateNum] || `State ${stateNum}`;
-        const icon = stateNum === 3 ? '✅' : stateNum === 2 ? '🔍' : stateNum === 1 ? '🔄' : '❓';
-        const color = stateNum === 3 ? '#0a7' : stateNum === 2 ? '#f90' : '#666';
+    let inSkySearch = false;
+    let inObstruction = false;
+    let inNetworkIssue = false;
+    let skySearchStart = 0;
+    let obstructionStart = 0;
+    let networkIssueStart = 0;
+    
+    const formatTime = (ts: number) => new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    }).format(new Date(ts));
+    
+    console.log(`📊 Analyzing ${downThroughput.length} samples for events...`);
+    
+    let minObsFrac = 1, maxObsFrac = 0, maxLoss = 0, maxLat = 0;
+    
+    // Calculate rolling baseline for obstruction (average over last 5 minutes)
+    const baselineWindow = 10; // samples (~5 minutes with 30s step)
+    const obstructionBaseline: number[] = [];
+    
+    for (let i = 0; i < downThroughput.length; i++) {
+      const ts = downThroughput[i][0];
+      const downBps = downThroughput[i][1];
+      const upBps = upThroughput[i]?.[1] || 0;
+      const obsFrac = obstructionFraction[i]?.[1] || 0;
+      const loss = packetLoss[i]?.[1] || 0;
+      const lat = (latency[i]?.[1] || 0) * 1000; // Convert to ms
+      
+      minObsFrac = Math.min(minObsFrac, obsFrac);
+      maxObsFrac = Math.max(maxObsFrac, obsFrac);
+      maxLoss = Math.max(maxLoss, loss);
+      maxLat = Math.max(maxLat, lat);
+      
+      // Sky Search: Both throughputs drop to near-zero (< 10000 bytes/sec = ~80 Kbps)
+      const isSkySearching = downBps < 10000 && upBps < 10000;
+      if (isSkySearching && !inSkySearch) {
+        inSkySearch = true;
+        skySearchStart = ts;
         events.push({
-          time: new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Los_Angeles',
-            month: 'short', day: 'numeric',
-            hour: '2-digit', minute: '2-digit', hour12: false
-          }).format(new Date(ts)),
-          message: `Dish state: ${stateName}`,
-          icon,
-          color
+          time: formatTime(ts),
+          timestamp: ts,
+          message: 'Sky search started',
+          icon: '🔍',
+          color: '#f90'
+        });
+      } else if (!isSkySearching && inSkySearch) {
+        inSkySearch = false;
+        const durationSec = Math.round((ts - skySearchStart) / 1000);
+        events.push({
+          time: formatTime(ts),
+          timestamp: ts,
+          message: `Connected (searched ${durationSec}s)`,
+          icon: '✅',
+          color: '#0a7'
         });
       }
-      lastState = stateNum;
-    }
-    
-    // Detect obstruction periods
-    let inObstruction = false;
-    let obstructionStart = 0;
-    for (const [ts, obstructed] of obstructedSeries) {
-      const isObstructed = obstructed > 0;
-      if (isObstructed && !inObstruction) {
+      
+      // Obstruction: Any measurable obstruction (> 0.005 = 0.5%)
+      const isObstructed = obsFrac > 0.005;
+      if (isObstructed && !inObstruction && !inSkySearch) {
         inObstruction = true;
         obstructionStart = ts;
         events.push({
-          time: new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Los_Angeles',
-            month: 'short', day: 'numeric',
-            hour: '2-digit', minute: '2-digit', hour12: false
-          }).format(new Date(ts)),
-          message: 'Obstruction detected',
+          time: formatTime(ts),
+          timestamp: ts,
+          message: `Obstruction detected (${(obsFrac * 100).toFixed(1)}%)`,
           icon: '🚫',
           color: '#c33'
         });
@@ -507,16 +584,123 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
         inObstruction = false;
         const durationSec = Math.round((ts - obstructionStart) / 1000);
         events.push({
-          time: new Intl.DateTimeFormat('en-US', {
-            timeZone: 'America/Los_Angeles',
-            month: 'short', day: 'numeric',
-            hour: '2-digit', minute: '2-digit', hour12: false
-          }).format(new Date(ts)),
+          time: formatTime(ts),
+          timestamp: ts,
           message: `Obstruction cleared (${durationSec}s)`,
           icon: '✓',
           color: '#0a7'
         });
       }
+      
+      // Network Issue: Elevated packet loss (> 1%) or high latency (> 60ms) with good throughput
+      const hasNetworkIssue = (loss > 0.01 || lat > 60) && downBps > 10000 && !inSkySearch;
+      if (hasNetworkIssue && !inNetworkIssue && !inObstruction) {
+        inNetworkIssue = true;
+        networkIssueStart = ts;
+        const reason = loss > 0.01 ? `${(loss * 100).toFixed(1)}% loss` : `${lat.toFixed(0)}ms latency`;
+        events.push({
+          time: formatTime(ts),
+          timestamp: ts,
+          message: `Network degradation (${reason})`,
+          icon: '⚠️',
+          color: '#f60'
+        });
+      } else if (!hasNetworkIssue && inNetworkIssue) {
+        inNetworkIssue = false;
+        const durationSec = Math.round((ts - networkIssueStart) / 1000);
+        events.push({
+          time: formatTime(ts),
+          timestamp: ts,
+          message: `Network recovered (${durationSec}s)`,
+          icon: '✓',
+          color: '#0a7'
+        });
+      }
+      
+      // Calculate rolling baseline for obstruction
+      obstructionBaseline.push(obsFrac);
+      if (obstructionBaseline.length > baselineWindow) {
+        obstructionBaseline.shift();
+      }
+      
+      // Detect significant changes from baseline (after we have enough samples)
+      // Check every 20 samples (20 × 30s = 10 minutes)
+      if (i > baselineWindow && i % 20 === 0) {
+        const avgBaseline = obstructionBaseline.reduce((a, b) => a + b, 0) / obstructionBaseline.length;
+        
+        // Spike detection: Current obstruction is 1.5x baseline or +1.5% absolute increase
+        if (obsFrac > avgBaseline * 1.5 && obsFrac > 0.015) {
+          events.push({
+            time: formatTime(ts),
+            timestamp: ts,
+            message: `Obstruction spike ${(obsFrac*100).toFixed(1)}% (baseline ${(avgBaseline*100).toFixed(1)}%)`,
+            icon: '🔴',
+            color: '#c33'
+          });
+        } else if (obsFrac > avgBaseline + 0.015) {
+          events.push({
+            time: formatTime(ts),
+            timestamp: ts,
+            message: `Obstruction increased ${(obsFrac*100).toFixed(1)}%`,
+            icon: '🟠',
+            color: '#f60'
+          });
+        }
+        
+        // High packet loss (above 3%)
+        if (loss > 0.03) {
+          events.push({
+            time: formatTime(ts),
+            timestamp: ts,
+            message: `High packet loss ${(loss*100).toFixed(1)}%`,
+            icon: '⚠️',
+            color: '#f90'
+          });
+        }
+      }
+      
+      // Periodic sampling: Report issues at regular intervals (every ~5 minutes)
+      if (sampleInterval > 0 && i % sampleInterval === 0 && i > 0) {
+        if (obsFrac > 0.01) {
+          events.push({
+            time: formatTime(ts),
+            timestamp: ts,
+            message: `Obstruction ${(obsFrac*100).toFixed(1)}%`,
+            icon: '🔴',
+            color: '#f60'
+          });
+        } else if (loss > 0.02) {
+          events.push({
+            time: formatTime(ts),
+            timestamp: ts,
+            message: `Packet loss ${(loss*100).toFixed(1)}%`,
+            icon: '⚠️',
+            color: '#f90'
+          });
+        } else if (lat > 50) {
+          events.push({
+            time: formatTime(ts),
+            timestamp: ts,
+            message: `High latency ${lat.toFixed(0)}ms`,
+            icon: '🐌',
+            color: '#fa0'
+          });
+        }
+      }
+    }
+    
+    // Add marker for persistent conditions at start of window if detected
+    if (downThroughput.length > 0 && maxObsFrac > 0.05) {
+      // Place event 1 minute into the window to ensure it's visible
+      const firstTs = downThroughput[0][0] + 60000;
+      const avgObsFrac = (minObsFrac + maxObsFrac) / 2;
+      events.push({
+        time: formatTime(firstTs),
+        timestamp: firstTs,
+        message: `Persistent obstruction (${(avgObsFrac*100).toFixed(1)}% avg)`,
+        icon: '🚫',
+        color: '#c33'
+      });
     }
     
     // Sort by time (newest first) and limit to last 20
@@ -526,6 +710,14 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
       return bTime - aTime;
     });
     starlinkEvents.value = events.slice(0, 20);
+    
+    console.log(`📡 Detected ${events.length} Starlink events in last ${Math.round(seconds/60)}min`);
+    console.log(`📊 Metrics summary: Obstruction ${(minObsFrac*100).toFixed(1)}%-${(maxObsFrac*100).toFixed(1)}%, Max loss ${(maxLoss*100).toFixed(1)}%, Max latency ${maxLat.toFixed(0)}ms`);
+    
+    // Report persistent conditions
+    if (maxObsFrac > 0.05 && events.length === 0) {
+      console.warn(`⚠️ Persistent obstruction detected (${(maxObsFrac*100).toFixed(1)}%) but no state changes - obstruction has been constant`);
+    }
   } catch (e) {
     console.error('Error loading Starlink events:', e);
     starlinkEvents.value = [];
@@ -574,7 +766,7 @@ const downMbPer10MinSeries = ref<Array<[number, number]>>([]);
 const upMbPer10MinSeries = ref<Array<[number, number]>>([]);
 const benchRuns = ref<Array<{ task: string; start: number; end: number }>>([]);
 const anomalySeries = ref<Array<[number, number]>>([]);
-const starlinkEvents = ref<Array<{ time: string; message: string; icon: string; color: string }>>([]);
+const starlinkEvents = ref<Array<{ time: string; timestamp: number; message: string; icon: string; color: string }>>([]);
 
 
 const hasLatencyData = computed(() => latencySeries.value.length > 0 || packetLossSeries.value.length > 0);
@@ -589,9 +781,18 @@ const latencyOption = computed(() => {
     .flatMap(run => {
       const dMb = typeof (run as any).mbDown === 'number' ? Math.trunc((run as any).mbDown) : undefined;
       const uMb = typeof (run as any).mbUp === 'number' ? Math.trunc((run as any).mbUp) : undefined;
-      const startItem: any = { name: `${run.task} ▶`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 }, task: run.task, mbDown: dMb, mbUp: uMb, label: { show: false } };
+      const startItem: any = { name: `${run.task} ▶\n${new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      }).format(new Date(run.start))}\n↓${dMb ?? '?'}MB ↑${uMb ?? '?'}MB`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 }, task: run.task, mbDown: dMb, mbUp: uMb, label: { show: false } };
       const endItem: any = { 
-        name: `${run.task} ◼`, 
+        name: `${run.task} ◼\n${new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Los_Angeles',
+          hour: '2-digit', minute: '2-digit', hour12: false
+        }).format(new Date(run.start))} - ${new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Los_Angeles',
+          hour: '2-digit', minute: '2-digit', hour12: false
+        }).format(new Date(run.end))}\n↓${dMb ?? '?'}MB ↑${uMb ?? '?'}MB`, 
         xAxis: run.end, 
         lineStyle: { color: '#b30000', width: 2 }, 
         task: run.task, 
@@ -680,9 +881,13 @@ const bandwidthOption = computed(() => {
     .flatMap(run => {
       const dMb = typeof (run as any).mbDown === 'number' ? Math.trunc((run as any).mbDown) : undefined;
       const uMb = typeof (run as any).mbUp === 'number' ? Math.trunc((run as any).mbUp) : undefined;
-      const startItem: any = { name: `${run.task} ▶`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 }, task: run.task, mbDown: dMb, mbUp: uMb, label: { show: false } };
+      const formatTime = (ts: number) => new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      }).format(new Date(ts));
+      const startItem: any = { name: `${run.task} ▶\n${formatTime(run.start)}\n↓${dMb ?? '?'}MB ↑${uMb ?? '?'}MB`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 }, task: run.task, mbDown: dMb, mbUp: uMb, label: { show: false } };
       const endItem: any = { 
-        name: `${run.task} ◼`, 
+        name: `${run.task} ◼\n${formatTime(run.start)} - ${formatTime(run.end)}\n↓${dMb ?? '?'}MB ↑${uMb ?? '?'}MB`, 
         xAxis: run.end, 
         lineStyle: { color: '#b30000', width: 2 }, 
         task: run.task, 
@@ -708,8 +913,10 @@ const bandwidthOption = computed(() => {
   const legendSelected = storedLegend ? JSON.parse(storedLegend) : undefined;
 
   return ({
-    tooltip: { trigger: 'axis' },
-    grid: { left: 40, right: 80, top: 64, bottom: 40 },
+    tooltip: { 
+      trigger: 'none'  // Disable automatic tooltip, let mark lines handle their own
+    },
+    grid: { left: 60, right: 100, top: 64, bottom: 40 },
     legend: { 
       top: 6, 
       data: ['Down (Mbps)', 'Up (Mbps)', 'Down (MB/min)', 'Up (MB/min)', 'Down (MB/10m)', 'Up (MB/10m)', 'Micro-loss (%/10)'],
@@ -740,11 +947,11 @@ const bandwidthOption = computed(() => {
         lineStyle: { width: 2 }
       },
       { type: 'line', name: 'Up (Mbps)', data: bandwidthUpSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 2 } },
-      { type: 'line', name: 'Down (MB/min)', data: downMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5, type: 'dotted' } },
-      { type: 'line', name: 'Up (MB/min)', data: upMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5, type: 'dotted' } },
-      { type: 'line', name: 'Down (MB/10m)', data: downMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5 } },
-      { type: 'line', name: 'Up (MB/10m)', data: upMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 2, lineStyle: { width: 1.5 } },
-      { type: 'line', name: 'Micro-loss (%/10)', data: microLossSeries.value, showSymbol: false, yAxisIndex: 1, lineStyle: { type: 'dashed', width: 2 } },
+      { type: 'line', name: 'Down (MB/min)', data: downMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 1, lineStyle: { width: 1.5, type: 'dotted' } },
+      { type: 'line', name: 'Up (MB/min)', data: upMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 1, lineStyle: { width: 1.5, type: 'dotted' } },
+      { type: 'line', name: 'Down (MB/10m)', data: downMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 1, lineStyle: { width: 1.5 } },
+      { type: 'line', name: 'Up (MB/10m)', data: upMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 1, lineStyle: { width: 1.5 } },
+      { type: 'line', name: 'Micro-loss (%/10)', data: microLossSeries.value, showSymbol: false, yAxisIndex: 2, lineStyle: { type: 'dashed', width: 2 } },
       // Invisible series to force markLine rendering (always present)
       {
         type: 'line', name: 'Benchmarks', data: [], showSymbol: false, xAxisIndex: 0, yAxisIndex: 0,
@@ -769,32 +976,92 @@ const bandwidthOption = computed(() => {
   });
 });
 
-const anomalyOption = computed(() => ({
-  tooltip: { trigger: 'axis' },
-  grid: { left: 40, right: 40, top: 40, bottom: 40 },
-  legend: { top: 6, data: ['Anomaly Rate (%)'] },
-  xAxis: { 
-    type: 'time',
-    axisLabel: {
-      formatter: (value: number) => new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/Los_Angeles',
-        hour: '2-digit', minute: '2-digit', hour12: false
-      }).format(new Date(value))
+const anomalyOption = computed(() => {
+  // Create mark lines for Starlink events
+  const eventMarkLines = starlinkEvents.value.map(event => ({
+    name: event.message,
+    xAxis: event.timestamp,
+    lineStyle: { color: event.color, width: 2, type: 'dashed' },
+    label: { 
+      show: true, 
+      formatter: event.icon,
+      fontSize: 14,
+      color: event.color
     }
-  },
-  yAxis: { type: 'value', name: '%', min: 0, max: 100 },
-  series: [
-    { 
-      type: 'line', 
-      name: 'Anomaly Rate (%)', 
-      data: anomalySeries.value, 
-      showSymbol: false, 
-      smooth: true, 
-      lineStyle: { width: 2, color: '#ff6b6b' },
-      areaStyle: { color: 'rgba(255, 107, 107, 0.1)' }
-    }
-  ]
-}));
+  }));
+  
+  if (eventMarkLines.length > 0) {
+    const now = Date.now();
+    const windowStart = now - (rangeSeconds.value * 1000);
+    console.log(`📍 Creating ${eventMarkLines.length} mark lines for Anomaly chart:`, eventMarkLines.map(m => {
+      // More inclusive boundary check - allow events within 2 minutes of window edges
+      const inWindow = m.xAxis > (windowStart - 120000) && m.xAxis < (now + 120000);
+      return { 
+        time: new Intl.DateTimeFormat('en-US', { 
+          timeZone: 'America/Los_Angeles', 
+          month: 'short', day: 'numeric', 
+          hour: '2-digit', minute: '2-digit', hour12: false 
+        }).format(new Date(m.xAxis)),
+        msg: m.name,
+        inWindow: inWindow ? '✅' : '❌'
+      };
+    }));
+    console.log(`📍 Current window: ${new Intl.DateTimeFormat('en-US', { 
+      timeZone: 'America/Los_Angeles', 
+      month: 'short', day: 'numeric', 
+      hour: '2-digit', minute: '2-digit', hour12: false 
+    }).format(new Date(windowStart))} to ${new Intl.DateTimeFormat('en-US', { 
+      timeZone: 'America/Los_Angeles', 
+      month: 'short', day: 'numeric', 
+      hour: '2-digit', minute: '2-digit', hour12: false 
+    }).format(new Date(now))}`);
+  }
+
+  return {
+    tooltip: { trigger: 'axis' },
+    grid: { left: 40, right: 40, top: 40, bottom: 40 },
+    legend: { top: 6, data: ['Anomaly Rate (%)'] },
+    xAxis: { 
+      type: 'time',
+      axisLabel: {
+        formatter: (value: number) => new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Los_Angeles',
+          hour: '2-digit', minute: '2-digit', hour12: false
+        }).format(new Date(value))
+      }
+    },
+    yAxis: [
+      { 
+        type: 'value', 
+        name: '%', 
+        min: 0, 
+        max: 100,
+        axisLabel: { 
+          formatter: '{value}'
+        }
+      },
+      // Dummy y-axes to match bandwidth chart structure for alignment
+      { type: 'value', show: false, position: 'right', offset: 0 },
+      { type: 'value', show: false, position: 'right', offset: 48 }
+    ],
+    series: [
+      { 
+        type: 'line', 
+        name: 'Anomaly Rate (%)', 
+        data: anomalySeries.value, 
+        showSymbol: false, 
+        smooth: true, 
+        lineStyle: { width: 2, color: '#ff6b6b' },
+        areaStyle: { color: 'rgba(255, 107, 107, 0.1)' },
+        markLine: eventMarkLines.length > 0 ? {
+          symbol: ['none', 'none'],
+          data: eventMarkLines,
+          label: { show: true, fontSize: 14 }
+        } : undefined
+      }
+    ]
+  };
+});
 
 function flagStyle(active: boolean) {
   return {
