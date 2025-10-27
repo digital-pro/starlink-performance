@@ -269,7 +269,7 @@ async function computeRunMb(run: { start: number; end: number }) {
   const durationMs = Math.max(0, (run.end || 0) - (run.start || 0));
   if (durationMs <= 0) return { mbDown: 0, mbUp: 0 };
   const seconds = Math.ceil(durationMs / 1000);
-  const step = 30; // seconds
+  const step = 10; // seconds
   const endSec = Math.floor(run.end / 1000);
   
   // Query returns bytes/sec, we'll integrate over time to get total bytes
@@ -284,39 +284,22 @@ async function computeRunMb(run: { start: number; end: number }) {
     fetchRangeProm('starlink_dish_uplink_throughput_bytes', seconds, step, endSec),    // USER UPLOAD (dish→satellite)
   ]);
   
-  // Integrate: sum(bytes/sec * step_seconds) / 1e6 = total MB
-  const sumBytes = (series: Array<[number, number]>) => 
-    series.reduce((acc, [, bytesPerSec]) => acc + (Number(bytesPerSec) * step), 0) / 1e6;
-  
-  // Sanity check: Compare integration with simple start/end difference
-  const getStartEndDiff = (series: Array<[number, number]>) => {
+  // Use trapezoidal integration over actual sample deltas
+  const integrateThroughputToMb = (series: Array<[number, number]>) => {
     if (series.length < 2) return 0;
-    const first = series[0][1];
-    const last = series[series.length - 1][1];
-    // Average throughput * duration
-    return ((first + last) / 2) * seconds / 1e6;
+    let totalBytes = 0;
+    for (let i = 0; i < series.length - 1; i++) {
+      const [t1, v1] = series[i];
+      const [t2, v2] = series[i + 1];
+      const dtSec = Math.max(0, (t2 - t1) / 1000);
+      const avgBytesPerSec = (Number(v1) + Number(v2)) / 2;
+      totalBytes += avgBytesPerSec * dtSec;
+    }
+    return totalBytes / 1e6;
   };
   
-  const integratedDown = sumBytes(downSeries);
-  const integratedUp = sumBytes(upSeries);
-  const startEndDown = getStartEndDiff(downSeries);
-  const startEndUp = getStartEndDiff(upSeries);
-  
-  // If integration differs from start/end by >30%, use start/end method
-  const downDiffPct = Math.abs(integratedDown - startEndDown) / Math.max(integratedDown, startEndDown, 1);
-  const upDiffPct = Math.abs(integratedUp - startEndUp) / Math.max(integratedUp, startEndUp, 1);
-  
-  let rawDown = integratedDown;
-  let rawUp = integratedUp;
-  
-  if (downDiffPct > 0.3) {
-    console.warn(`⚠️ Download sanity check failed: integrated=${integratedDown.toFixed(1)}MB vs start/end=${startEndDown.toFixed(1)}MB (${(downDiffPct*100).toFixed(0)}% diff) - using start/end`);
-    rawDown = startEndDown;
-  }
-  if (upDiffPct > 0.3) {
-    console.warn(`⚠️ Upload sanity check failed: integrated=${integratedUp.toFixed(1)}MB vs start/end=${startEndUp.toFixed(1)}MB (${(upDiffPct*100).toFixed(0)}% diff) - using start/end`);
-    rawUp = startEndUp;
-  }
+  const rawDown = integrateThroughputToMb(downSeries);
+  const rawUp = integrateThroughputToMb(upSeries);
   
   // Subtract baseline traffic (baseline is in Mbps, convert to MB over duration)
   const baselineMbDown = (baselineDownMbps.value * seconds) / 8; // Mbps * seconds / 8 = MB
@@ -494,7 +477,7 @@ async function refreshAll() {
   }
 
   // Starlink Events: detect state changes and obstructions
-  await loadStarlinkEvents(seconds, step, fixedEnd);
+  await loadStarlinkEvents(seconds, 30, fixedEnd);
 }
 
 async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: number) {
@@ -659,34 +642,6 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
         }
       }
       
-      // Periodic sampling: Report issues at regular intervals (every ~5 minutes)
-      if (sampleInterval > 0 && i % sampleInterval === 0 && i > 0) {
-        if (obsFrac > 0.01) {
-          events.push({
-            time: formatTime(ts),
-            timestamp: ts,
-            message: `Obstruction ${(obsFrac*100).toFixed(1)}%`,
-            icon: '🔴',
-            color: '#f60'
-          });
-        } else if (loss > 0.02) {
-          events.push({
-            time: formatTime(ts),
-            timestamp: ts,
-            message: `Packet loss ${(loss*100).toFixed(1)}%`,
-            icon: '⚠️',
-            color: '#f90'
-          });
-        } else if (lat > 50) {
-          events.push({
-            time: formatTime(ts),
-            timestamp: ts,
-            message: `High latency ${lat.toFixed(0)}ms`,
-            icon: '🐌',
-            color: '#fa0'
-          });
-        }
-      }
     }
     
     // Add marker for persistent conditions at start of window if detected
@@ -866,7 +821,7 @@ const latencyOption = computed(() => {
           } },
           data: markLineData,
           emphasis: { lineStyle: { width: 2 } },
-          silent: true
+          silent: false
         } : undefined
       }
     ]
@@ -913,8 +868,9 @@ const bandwidthOption = computed(() => {
   const legendSelected = storedLegend ? JSON.parse(storedLegend) : undefined;
 
   return ({
-    tooltip: { 
-      trigger: 'none'  // Disable automatic tooltip, let mark lines handle their own
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' }
     },
     grid: { left: 60, right: 100, top: 64, bottom: 40 },
     legend: { 
@@ -969,7 +925,7 @@ const bandwidthOption = computed(() => {
           } },
           data: ([{ name: 'T-5m', xAxis: now - 5*60*1000, lineStyle: { color: '#1273EB', width: 4 } } as any].concat(markLineData as any)) as any,
           emphasis: { lineStyle: { width: 2 } },
-          silent: true
+          silent: false
         } : undefined
       }
     ]
