@@ -73,7 +73,8 @@ async function startExporter() {
   try {
     await run(`test -x ${bin} || (cd /home/djc/starlink_exporter && go build -o ${bin} ./cmd/starlink_exporter)`);
   } catch {}
-  await run(`nohup ${bin} -port 9817 > /home/djc/levante/levante-performance/logs/starlink_exporter.out 2>&1 & echo $! > /home/djc/levante/levante-performance/logs/starlink_exporter.pid`);
+  const dishAddr = process.env.STARLINK_DISH_ADDR || '192.168.100.1:9201';
+  await run(`nohup ${bin} -address ${dishAddr} -port 9817 > /home/djc/levante/levante-performance/logs/starlink_exporter.out 2>&1 & echo $! > /home/djc/levante/levante-performance/logs/starlink_exporter.pid`);
 }
 
 async function restartProm() {

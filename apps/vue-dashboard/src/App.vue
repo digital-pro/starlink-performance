@@ -12,9 +12,9 @@
     <section style="margin-top: 8px;">
       <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; color:#556; font-size: 13px;">
         <strong>Correlation (last 15m):</strong>
-        <span style="padding:4px 8px; border-radius:8px; background:#eef; border:1px solid #dde;" title="Correlation coefficient between latency and packet drops over the last 15 minutes. Values closer to +1 or -1 indicate stronger correlation. Range: -1 to +1.">Latency↔Drops: {{ typeof corr.drops === 'number' ? corr.drops.toFixed(2) : 'N/A' }}</span>
-        <span style="padding:4px 8px; border-radius:8px; background:#eef; border:1px solid #dde;" title="Correlation coefficient between latency and CPU usage over the last 15 minutes. Positive values suggest CPU load may be impacting network performance. Range: -1 to +1.">Latency↔CPU: {{ typeof corr.cpu === 'number' ? corr.cpu.toFixed(2) : 'N/A' }}</span>
-        <span :style="periodicityStyle(corr.periodic)" title="Detects if latency shows a repeating pattern every ~15 seconds via autocorrelation analysis. YES (yellow) indicates periodic spikes, which may suggest scheduled processes, satellite beam switching, or regular interference. NO means variations appear random or follow a different pattern.">15s periodicity: {{ corr.periodic ? 'YES' : 'no' }}</span>
+        <span style="padding:4px 8px; border-radius:8px; background:#eef; border:1px solid #dde; display:inline-flex; align-items:center;" title="Correlation coefficient between latency and packet drops over the last 15 minutes. Values closer to +1 or -1 indicate stronger correlation. Range: -1 to +1.">Latency↔Drops: {{ typeof corr.drops === 'number' && Number.isFinite(corr.drops) ? corr.drops.toFixed(2) : 'N/A' }}</span>
+        <span style="padding:4px 8px; border-radius:8px; background:#eef; border:1px solid #dde; display:inline-flex; align-items:center;" title="Correlation coefficient between latency and CPU usage over the last 15 minutes. Positive values suggest CPU load may be impacting network performance. Range: -1 to +1.">Latency↔CPU: {{ typeof corr.cpu === 'number' && Number.isFinite(corr.cpu) ? corr.cpu.toFixed(2) : 'N/A' }}</span>
+        <span style="padding:4px 8px; border-radius:8px; background:#eef; border:1px solid #dde; display:inline-flex; align-items:center;" :style="periodicityStyle(corr.periodic)" title="Detects if latency shows a repeating pattern every ~15 seconds via autocorrelation analysis. YES (yellow) indicates periodic spikes, which may suggest scheduled processes, satellite beam switching, or regular interference. NO means variations appear random or follow a different pattern.">15s periodicity: {{ corr.periodic ? 'YES' : 'no' }}</span>
         <span style="margin-left:12px;">Range:</span>
         <select v-model="rangeSeconds" @change="refreshAll" style="padding:4px 8px; border-radius:6px; border:1px solid #ccd; background:white;">
           <option :value="600">Last 10 minutes</option>
@@ -44,16 +44,32 @@
 
     <!-- Totals and Diagnostics in one row -->
     <section style="margin-top: 12px;">
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
-        <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff;" title="Sum of downlink Mbps over last hour converted to GB (assumes 15s scrape interval)">
-          <div style="font-size:12px; color:#778;">Total Download (last hour)</div>
-          <div style="font-size:20px; font-weight:600;">{{ typeof totalDownGb === 'number' ? totalDownGb.toFixed(2) : 'N/A' }} GB</div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
+          <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Sum of downlink Mbps over last hour converted to GB (assumes 15s scrape interval)">
+            <div style="font-size:11px; color:#778;">Download (last hour)</div>
+            <div style="font-size:18px; font-weight:600;">{{ typeof totalDownGb === 'number' ? totalDownGb.toFixed(2) : 'N/A' }} GB</div>
+          </div>
+          <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Windows WiFi adapter link speed (Mbps). This is the negotiated connection speed between your WiFi adapter and Starlink router.">
+            <div style="font-size:11px; color:#778;">WiFi Speed</div>
+            <div style="font-size:18px; font-weight:600;">{{ typeof nicSpeedMbps === 'number' && Number.isFinite(nicSpeedMbps) ? Math.floor(nicSpeedMbps) : 'N/A' }} Mbps</div>
+          </div>
+          <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="GPS location of Starlink dish">
+            <div style="font-size:11px; color:#778;">Location</div>
+            <div style="display:flex; align-items:center; gap:4px;">
+              <div style="font-size:16px; font-weight:600;">{{ formatGpsLocation() }}</div>
+              <img 
+                v-if="gpsLatitude !== null && gpsLongitude !== null"
+                @click="showMapModal = true"
+                :src="`https://maps.googleapis.com/maps/api/staticmap?center=${gpsLatitude},${gpsLongitude}&zoom=15&size=60x60&markers=color:red%7C${gpsLatitude},${gpsLongitude}&key=AIzaSyBFw0Qbyq9zTFTd-tUY6d13V3-kNgJGLrI`"
+                alt="Location map"
+                style="cursor:pointer; width:28px; height:28px; border-radius:3px; border:1px solid #ddd; flex-shrink:0;"
+                title="Click to open larger map"
+              />
+            </div>
+          </div>
         </div>
-        <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff;" title="Windows WiFi adapter link speed (Mbps). This is the negotiated connection speed between your WiFi adapter and router, not your internet speed.">
-          <div style="font-size:12px; color:#778;">WiFi Link Speed</div>
-          <div style="font-size:20px; font-weight:600;">{{ format3(nicSpeedMbps) }} Mbps</div>
-        </div>
-        <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff; grid-column: span 2;" title="Diagnostic flags derived from recording rules for common issues">
+        <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff;" title="Diagnostic flags derived from recording rules for common issues">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <strong style="font-size:13px;">Diagnostics</strong>
             <small style="color:#778; font-size:11px;">spike / micro-loss / outage / obstruction</small>
@@ -99,7 +115,7 @@
         <v-chart v-else :option="latencyOption" autoresize style="height:180px; margin-top:8px;" />
       </div>
 
-      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;" title="Anomaly detection rate and Starlink events overlay">
+      <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Anomaly Detection & Starlink Events</h3>
           <small style="color:#778;">netdata anomaly rate + state changes</small>
@@ -110,6 +126,26 @@
 
       
     </section>
+
+    <!-- GPS Map Modal -->
+    <div v-if="showMapModal && gpsLatitude !== null && gpsLongitude !== null" style="position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:9999;" @click="showMapModal = false">
+      <div style="width: min(800px, 95%); height: min(600px, 90%); background:white; border-radius:12px; border:1px solid #ddd; box-shadow:0 6px 24px rgba(0,0,0,0.2); display:flex; flex-direction:column;" @click.stop>
+        <div style="padding:12px 16px; border-bottom:1px solid #eee; display:flex; align-items:center; justify-content:space-between;">
+          <h3 style="margin:0;">Starlink Dish Location</h3>
+          <button @click="showMapModal = false" style="padding:4px 8px; border:1px solid #999; background:#f5f5f5; color:#333; border-radius:6px; cursor:pointer; font-size:12px;">Close</button>
+        </div>
+        <div style="flex:1; padding:16px;">
+          <iframe 
+            :src="`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6d13V3-kNgJGLrI&q=${gpsLatitude},${gpsLongitude}&zoom=15`"
+            width="100%" 
+            height="100%" 
+            style="border:0; border-radius:8px;" 
+            allowfullscreen 
+            loading="lazy">
+          </iframe>
+        </div>
+      </div>
+    </div>
 
     <!-- Packet Loss Details Modal -->
     <div v-if="showLossDetails" style="position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:9999;">
@@ -146,11 +182,66 @@
       </div>
     </div>
 
-    <footer style="margin-top: 24px; color:#667;">
-      <small>
-        Prometheus via <code>/api/promql</code>. Ensure `PROM_URL` and auth are set in Vercel. This is a starter UI; extend with alerts, gauges, and trend comparisons.
-      </small>
-    </footer>
+    <!-- Diagnostic Charts Section -->
+    <section style="margin-top: 24px;">
+      <h3 style="margin:0 0 12px 0; color:#334;">Connection Diagnostics</h3>
+      <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px;">
+        <!-- SNR Chart -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px;">SNR (dB)</div>
+          <div v-if="snrSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="snrOption" autoresize style="height:80px;" />
+        </div>
+
+        <!-- Dish State Chart -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px;">Dish State</div>
+          <div v-if="dishStateSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="dishStateOption" autoresize style="height:80px;" />
+        </div>
+
+        <!-- Backup Beam Chart -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px;">Backup Beam</div>
+          <div v-if="backupBeamSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="backupBeamOption" autoresize style="height:80px;" />
+        </div>
+
+        <!-- Time to Slot End Chart -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px;">Time to Slot End (s)</div>
+          <div v-if="slotEndSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="slotEndOption" autoresize style="height:80px;" />
+        </div>
+
+        <!-- Bore Sight Azimuth Chart -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px;">Azimuth (deg)</div>
+          <div v-if="azimuthSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="azimuthOption" autoresize style="height:80px;" />
+        </div>
+
+        <!-- Bore Sight Elevation Chart -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px;">Elevation (deg)</div>
+          <div v-if="elevationSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="elevationOption" autoresize style="height:80px;" />
+        </div>
+
+        <!-- Time to First Nonempty Slot Chart -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px;">First Slot (s)</div>
+          <div v-if="firstSlotSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="firstSlotOption" autoresize style="height:80px;" />
+        </div>
+
+        <!-- Placeholder for 8th chart (can add alerts later) -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px;">Alerts</div>
+          <div style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">Coming soon</div>
+        </div>
+      </div>
+    </section>
   </main>
 </template>
 
@@ -184,6 +275,9 @@ const corr = ref<{ drops: number | 'N/A'; cpu: number | 'N/A'; ac15: number | 'N
 
 const totalDownGb = ref<number | 'N/A'>('N/A');
 const nicSpeedMbps = ref<number | 'N/A'>('N/A');
+const gpsLatitude = ref<number | null>(null);
+const gpsLongitude = ref<number | null>(null);
+const showMapModal = ref(false);
 // bucket info removed
 // Initialize rangeSeconds from localStorage, default to 1 hour
 const storedRange = localStorage.getItem('levante_rangeSeconds');
@@ -229,6 +323,13 @@ function format3(value: number | string): string | number {
   return value;
 }
 
+function formatGpsLocation(): string {
+  if (gpsLatitude.value !== null && gpsLongitude.value !== null) {
+    return `${gpsLatitude.value.toFixed(1)}, ${gpsLongitude.value.toFixed(1)}`;
+  }
+  return 'N/A';
+}
+
 function formatPct(v: number | 'N/A') {
   if (typeof v === 'number' && Number.isFinite(v)) return v.toFixed(2);
   return 'N/A';
@@ -265,6 +366,18 @@ async function fetchRangeProm(query: string, seconds = 600, step = 10, fixedEnd?
   }
 }
 
+function clampSeriesPercentile(series: Array<[number, number]>, percentile = 0.98, factor = 1.5, hardMax?: number): Array<[number, number]> {
+  if (!Array.isArray(series) || series.length === 0) return series;
+  const values = series.map(([, v]) => Number(v)).filter((v) => Number.isFinite(v) && v >= 0).sort((a, b) => a - b);
+  if (values.length === 0) return series;
+  const idx = Math.max(0, Math.min(values.length - 1, Math.floor(percentile * (values.length - 1))));
+  const p = values[idx];
+  const maxVal = hardMax !== undefined 
+    ? Math.min(p * factor, hardMax) 
+    : p * factor;
+  return series.map(([t, v]) => [t, Math.min(Math.max(0, Number(v)), maxVal)] as [number, number]);
+}
+
 async function computeRunMb(run: { start: number; end: number }) {
   const durationMs = Math.max(0, (run.end || 0) - (run.start || 0));
   if (durationMs <= 0) return { mbDown: 0, mbUp: 0 };
@@ -284,15 +397,38 @@ async function computeRunMb(run: { start: number; end: number }) {
     fetchRangeProm('starlink_dish_uplink_throughput_bytes', seconds, step, endSec),    // USER UPLOAD (dish→satellite)
   ]);
   
-  // Use trapezoidal integration over actual sample deltas
+  // Use trapezoidal integration with robust outlier rejection (median/MAD clamp)
   const integrateThroughputToMb = (series: Array<[number, number]>) => {
     if (series.length < 2) return 0;
+    // Clean and gather finite, non-negative samples
+    const cleaned: Array<[number, number]> = [];
+    const values: number[] = [];
+    for (const [t, vRaw] of series) {
+      const v = Number(vRaw);
+      if (Number.isFinite(v) && v >= 0 && Number.isFinite(t)) {
+        cleaned.push([t, v]);
+        values.push(v);
+      }
+    }
+    if (cleaned.length < 2) return 0;
+    // Compute robust center and scale using median and MAD
+    const sorted = values.slice().sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)] || 0;
+    const absDevs = values.map(v => Math.abs(v - median)).sort((a, b) => a - b);
+    const mad = absDevs[Math.floor(absDevs.length / 2)] || 0; // median absolute deviation
+    // Convert MAD to an approximate standard deviation (sigma ≈ 1.4826 * MAD)
+    const sigma = (mad || 0) * 1.4826;
+    // Clamp extreme spikes above median + 6σ (very conservative), minimum floor 10KB/s
+    const clampMax = Math.max(1e4, median + 6 * sigma);
     let totalBytes = 0;
-    for (let i = 0; i < series.length - 1; i++) {
-      const [t1, v1] = series[i];
-      const [t2, v2] = series[i + 1];
-      const dtSec = Math.max(0, (t2 - t1) / 1000);
-      const avgBytesPerSec = (Number(v1) + Number(v2)) / 2;
+    for (let i = 0; i < cleaned.length - 1; i++) {
+      const [t1, v1raw] = cleaned[i];
+      const [t2, v2raw] = cleaned[i + 1];
+      const dtSec = (t2 - t1) / 1000;
+      if (!Number.isFinite(dtSec) || dtSec <= 0 || dtSec > 60) continue; // ignore gaps and timebase spikes
+      const v1 = Math.min(v1raw, clampMax);
+      const v2 = Math.min(v2raw, clampMax);
+      const avgBytesPerSec = (v1 + v2) / 2;
       totalBytes += avgBytesPerSec * dtSec;
     }
     return totalBytes / 1e6;
@@ -420,9 +556,17 @@ async function refreshAll() {
   const totalGb = await fetchInstantProm('sum_over_time(starlink_down_mbps[1h]) * 15 / 8000');
   totalDownGb.value = typeof totalGb === 'number' && Number.isFinite(totalGb) ? totalGb : 'N/A';
 
-  // WiFi link speed (Mbps): windows_wifi_link_speed_mbps
+  // WiFi link speed (Mbps): windows_wifi_link_speed_mbps - connection speed between computer and Starlink router
   const wifi = await fetchInstantProm('windows_wifi_link_speed_mbps');
   nicSpeedMbps.value = typeof wifi === 'number' && Number.isFinite(wifi) ? wifi : 'N/A';
+
+  // GPS location
+  const [gpsLat, gpsLon] = await Promise.all([
+    fetchInstantProm('starlink_dish_gps_latitude'),
+    fetchInstantProm('starlink_dish_gps_longitude')
+  ]);
+  gpsLatitude.value = typeof gpsLat === 'number' && Number.isFinite(gpsLat) ? gpsLat : null;
+  gpsLongitude.value = typeof gpsLon === 'number' && Number.isFinite(gpsLon) ? gpsLon : null;
 
   const fixedEnd = Math.floor(Date.now() / 1000);
   const seconds = rangeSeconds.value;
@@ -441,14 +585,35 @@ async function refreshAll() {
   bandwidthDownSeries.value = down;
   bandwidthUpSeries.value = up;
   microLossSeries.value = ml;
-  downMbPerMinSeries.value = downMBm;
-  upMbPerMinSeries.value = upMBm;
-  downMbPer10MinSeries.value = downMB10;
-  upMbPer10MinSeries.value = upMB10;
+  // Clamp MB/min and MB/10m to reduce unrealistic spikes from transient exporter outliers
+  // Hard cap: Starlink max theoretical is ~300 Mbps = ~37.5 MB/s = ~2250 MB/min, so cap at 3000 MB/min for safety
+  // Use 95th percentile (more aggressive) with 1.3x factor to catch outliers
+  downMbPerMinSeries.value = clampSeriesPercentile(downMBm, 0.95, 1.3, 3000);
+  upMbPerMinSeries.value = clampSeriesPercentile(upMBm, 0.95, 1.3, 3000);
+  downMbPer10MinSeries.value = clampSeriesPercentile(downMB10, 0.95, 1.3, 30000);
+  upMbPer10MinSeries.value = clampSeriesPercentile(upMB10, 0.95, 1.3, 30000);
 
   // Anomaly detection
   anomalySeries.value = await fetchRangeProm('netdata_anomaly_detection_anomaly_rate_percentage_average', seconds, step, fixedEnd);
   console.log(`📊 Anomaly series: ${anomalySeries.value.length} data points`);
+
+  // Diagnostic charts
+  const [snr, dishState, backupBeam, slotEnd, azimuth, elevation, firstSlot] = await Promise.all([
+    fetchRangeProm('starlink_dish_snr', seconds, step, fixedEnd),
+    fetchRangeProm('starlink_dish_state', seconds, step, fixedEnd),
+    fetchRangeProm('starlink_dish_backup_beam', seconds, step, fixedEnd),
+    fetchRangeProm('starlink_dish_time_to_slot_end_seconds', seconds, step, fixedEnd),
+    fetchRangeProm('starlink_dish_bore_sight_azimuth_deg', seconds, step, fixedEnd),
+    fetchRangeProm('starlink_dish_bore_sight_elevation_deg', seconds, step, fixedEnd),
+    fetchRangeProm('starlink_dish_first_nonempty_slot_seconds', seconds, step, fixedEnd)
+  ]);
+  snrSeries.value = snr;
+  dishStateSeries.value = dishState;
+  backupBeamSeries.value = backupBeam;
+  slotEndSeries.value = slotEnd;
+  azimuthSeries.value = azimuth;
+  elevationSeries.value = elevation;
+  firstSlotSeries.value = firstSlot;
 
   // Flags
   const [spike, microLoss, outage, obstruction] = await Promise.all([
@@ -467,12 +632,14 @@ async function refreshAll() {
     const r = await axios.get('/api/ai-correlate', { params: { seconds: 900, step: 10 } });
     const c = (r.data && r.data.corr) ? r.data.corr : {} as any;
     const p = (r.data && r.data.periodicity) ? r.data.periodicity : {} as any;
-    const toNum = (x: any) => (typeof x === 'number' && Number.isFinite(x) ? x : 'N/A');
+    const toNum = (x: any) => (x !== null && x !== undefined && typeof x === 'number' && Number.isFinite(x)) ? x : 'N/A';
     corr.value.drops = toNum(c.latency_vs_drops);
     corr.value.cpu = toNum(c.latency_vs_cpu);
     corr.value.ac15 = toNum(p.ac_15s);
     corr.value.periodic = Boolean(p.detected);
-  } catch {
+    console.log('Correlation data:', { drops: corr.value.drops, cpu: corr.value.cpu, periodic: corr.value.periodic });
+  } catch (e) {
+    console.error('Failed to fetch correlation:', e);
     corr.value = { drops: 'N/A', cpu: 'N/A', ac15: 'N/A', periodic: false };
   }
 
@@ -486,8 +653,8 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
   try {
     // Fetch metrics for smart event detection
     const [downThroughput, upThroughput, obstructionFraction, packetLoss, latency] = await Promise.all([
-      fetchRangeProm('starlink_dish_uplink_throughput_bytes', seconds, step, fixedEnd),      // User download
-      fetchRangeProm('starlink_dish_downlink_throughput_bytes', seconds, step, fixedEnd),    // User upload
+      fetchRangeProm('starlink_dish_downlink_throughput_bytes', seconds, step, fixedEnd),    // User download (satellite→dish)
+      fetchRangeProm('starlink_dish_uplink_throughput_bytes', seconds, step, fixedEnd),      // User upload (dish→satellite)
       fetchRangeProm('starlink_dish_fraction_obstruction_ratio', seconds, step, fixedEnd),
       fetchRangeProm('starlink_dish_pop_ping_drop_ratio', seconds, step, fixedEnd),
       fetchRangeProm('starlink_dish_pop_ping_latency_seconds', seconds, step, fixedEnd)
@@ -503,7 +670,7 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
     const formatTime = (ts: number) => new Intl.DateTimeFormat('en-US', {
       timeZone: 'America/Los_Angeles',
       month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit', hour12: false
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
     }).format(new Date(ts));
     
     console.log(`📊 Analyzing ${downThroughput.length} samples for events...`);
@@ -723,6 +890,15 @@ const benchRuns = ref<Array<{ task: string; start: number; end: number }>>([]);
 const anomalySeries = ref<Array<[number, number]>>([]);
 const starlinkEvents = ref<Array<{ time: string; timestamp: number; message: string; icon: string; color: string }>>([]);
 
+// Diagnostic charts series
+const snrSeries = ref<Array<[number, number]>>([]);
+const dishStateSeries = ref<Array<[number, number]>>([]);
+const backupBeamSeries = ref<Array<[number, number]>>([]);
+const slotEndSeries = ref<Array<[number, number]>>([]);
+const azimuthSeries = ref<Array<[number, number]>>([]);
+const elevationSeries = ref<Array<[number, number]>>([]);
+const firstSlotSeries = ref<Array<[number, number]>>([]);
+
 
 const hasLatencyData = computed(() => latencySeries.value.length > 0 || packetLossSeries.value.length > 0);
 const hasBandwidthData = computed(() => bandwidthDownSeries.value.length > 0 || bandwidthUpSeries.value.length > 0 || microLossSeries.value.length > 0 || downMbPerMinSeries.value.length > 0 || upMbPerMinSeries.value.length > 0 || downMbPer10MinSeries.value.length > 0 || upMbPer10MinSeries.value.length > 0);
@@ -938,9 +1114,18 @@ const anomalyOption = computed(() => {
     name: event.message,
     xAxis: event.timestamp,
     lineStyle: { color: event.color, width: 2, type: 'dashed' },
+    icon: event.icon,
     label: { 
       show: true, 
-      formatter: event.icon,
+      formatter: (p: any) => {
+        const ts = typeof p?.data?.xAxis === 'number' ? p.data.xAxis : undefined;
+        const time = typeof ts === 'number' ? new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Los_Angeles',
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        }).format(new Date(ts)) : '';
+        const icon = p?.data?.icon || '';
+        return time ? `${icon} ${time}` : icon;
+      },
       fontSize: 14,
       color: event.color
     }
@@ -956,7 +1141,7 @@ const anomalyOption = computed(() => {
         time: new Intl.DateTimeFormat('en-US', { 
           timeZone: 'America/Los_Angeles', 
           month: 'short', day: 'numeric', 
-          hour: '2-digit', minute: '2-digit', hour12: false 
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
         }).format(new Date(m.xAxis)),
         msg: m.name,
         inWindow: inWindow ? '✅' : '❌'
@@ -974,7 +1159,7 @@ const anomalyOption = computed(() => {
   }
 
   return {
-    tooltip: { trigger: 'axis' },
+    tooltip: { trigger: 'item' },
     grid: { left: 40, right: 40, top: 40, bottom: 40 },
     legend: { top: 6, data: ['Anomaly Rate (%)'] },
     xAxis: { 
@@ -1007,15 +1192,170 @@ const anomalyOption = computed(() => {
         data: anomalySeries.value, 
         showSymbol: false, 
         smooth: true, 
+        tooltip: { show: false },
         lineStyle: { width: 2, color: '#ff6b6b' },
         areaStyle: { color: 'rgba(255, 107, 107, 0.1)' },
         markLine: eventMarkLines.length > 0 ? {
           symbol: ['none', 'none'],
           data: eventMarkLines,
-          label: { show: true, fontSize: 14 }
+          label: { show: true, fontSize: 14 },
+          tooltip: { 
+            show: true, 
+            formatter: (p: any) => {
+              const name = p?.data?.name || p?.name || '';
+              const ts = typeof p?.data?.xAxis === 'number' ? p.data.xAxis : undefined;
+              const time = typeof ts === 'number' ? new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/Los_Angeles',
+                month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+              }).format(new Date(ts)) : '';
+              return time ? `${name}\n${time}` : name;
+            }
+          }
         } : undefined
       }
     ]
+  };
+});
+
+// Diagnostic chart options
+const snrOption = computed(() => {
+  const now = Date.now();
+  const windowStart = now - (rangeSeconds.value * 1000);
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    grid: { left: 35, right: 10, top: 5, bottom: 20 },
+    xAxis: { type: 'time', show: false },
+    yAxis: { type: 'value', name: 'dB', min: 0 },
+    series: [{
+      type: 'line',
+      name: 'SNR',
+      data: snrSeries.value.filter(([t]) => t >= windowStart),
+      showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 1.5, color: '#4a90e2' },
+      areaStyle: { color: 'rgba(74, 144, 226, 0.1)' }
+    }]
+  };
+});
+
+const dishStateOption = computed(() => {
+  const now = Date.now();
+  const windowStart = now - (rangeSeconds.value * 1000);
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    grid: { left: 35, right: 10, top: 5, bottom: 20 },
+    xAxis: { type: 'time', show: false },
+    yAxis: { type: 'value', name: 'State', min: 0, max: 3 },
+    series: [{
+      type: 'line',
+      name: 'State',
+      data: dishStateSeries.value.filter(([t]) => t >= windowStart),
+      showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 1.5, color: '#50c878' },
+      areaStyle: { color: 'rgba(80, 200, 120, 0.1)' }
+    }]
+  };
+});
+
+const backupBeamOption = computed(() => {
+  const now = Date.now();
+  const windowStart = now - (rangeSeconds.value * 1000);
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    grid: { left: 35, right: 10, top: 5, bottom: 20 },
+    xAxis: { type: 'time', show: false },
+    yAxis: { type: 'value', name: 'Backup', min: 0, max: 1 },
+    series: [{
+      type: 'line',
+      name: 'Backup Beam',
+      data: backupBeamSeries.value.filter(([t]) => t >= windowStart),
+      showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 1.5, color: '#ff9500' },
+      areaStyle: { color: 'rgba(255, 149, 0, 0.1)' }
+    }]
+  };
+});
+
+const slotEndOption = computed(() => {
+  const now = Date.now();
+  const windowStart = now - (rangeSeconds.value * 1000);
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    grid: { left: 35, right: 10, top: 5, bottom: 20 },
+    xAxis: { type: 'time', show: false },
+    yAxis: { type: 'value', name: 's' },
+    series: [{
+      type: 'line',
+      name: 'Slot End',
+      data: slotEndSeries.value.filter(([t]) => t >= windowStart),
+      showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 1.5, color: '#9b59b6' },
+      areaStyle: { color: 'rgba(155, 89, 182, 0.1)' }
+    }]
+  };
+});
+
+const azimuthOption = computed(() => {
+  const now = Date.now();
+  const windowStart = now - (rangeSeconds.value * 1000);
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    grid: { left: 35, right: 10, top: 5, bottom: 20 },
+    xAxis: { type: 'time', show: false },
+    yAxis: { type: 'value', name: 'deg' },
+    series: [{
+      type: 'line',
+      name: 'Azimuth',
+      data: azimuthSeries.value.filter(([t]) => t >= windowStart),
+      showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 1.5, color: '#e74c3c' },
+      areaStyle: { color: 'rgba(231, 76, 60, 0.1)' }
+    }]
+  };
+});
+
+const elevationOption = computed(() => {
+  const now = Date.now();
+  const windowStart = now - (rangeSeconds.value * 1000);
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    grid: { left: 35, right: 10, top: 5, bottom: 20 },
+    xAxis: { type: 'time', show: false },
+    yAxis: { type: 'value', name: 'deg' },
+    series: [{
+      type: 'line',
+      name: 'Elevation',
+      data: elevationSeries.value.filter(([t]) => t >= windowStart),
+      showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 1.5, color: '#16a085' },
+      areaStyle: { color: 'rgba(22, 160, 133, 0.1)' }
+    }]
+  };
+});
+
+const firstSlotOption = computed(() => {
+  const now = Date.now();
+  const windowStart = now - (rangeSeconds.value * 1000);
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    grid: { left: 35, right: 10, top: 5, bottom: 20 },
+    xAxis: { type: 'time', show: false },
+    yAxis: { type: 'value', name: 's' },
+    series: [{
+      type: 'line',
+      name: 'First Slot',
+      data: firstSlotSeries.value.filter(([t]) => t >= windowStart),
+      showSymbol: false,
+      smooth: true,
+      lineStyle: { width: 1.5, color: '#c0392b' },
+      areaStyle: { color: 'rgba(192, 57, 43, 0.1)' }
+    }]
   };
 });
 
@@ -1034,14 +1374,12 @@ function flagStyle(active: boolean) {
 
 function periodicityStyle(detected: boolean) {
   return {
-    marginTop: '8px',
-    display: 'inline-block',
-    padding: '6px 10px',
+    padding: '4px 8px',
     borderRadius: '8px',
-    fontWeight: 600,
-    color: detected ? '#856404' : '#666',
-    background: detected ? '#fff3cd' : '#f5f5f5',
-    border: `1px solid ${detected ? '#ffeaa7' : '#ddd'}`
+    background: detected ? '#fff3cd' : '#eef',
+    border: detected ? '1px solid #ffeaa7' : '1px solid #dde',
+    display: 'inline-flex',
+    alignItems: 'center'
   } as const;
 }
 
