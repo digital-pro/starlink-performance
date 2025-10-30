@@ -1,4 +1,4 @@
-# Levante Performance
+# Starlink Performance
 
 A cloud-hosted performance dashboard for Starlink, built with Vue + TypeScript and deployed on Vercel. The UI reads metrics from Grafana Cloud Prometheus via a secure serverless proxy.
 
