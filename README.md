@@ -68,7 +68,19 @@ Grafana Cloud specifics:
 - For reads, create an Access Policy token with scope `metrics:read` and use your stack’s Instance ID as the username.
 - For remote_write (optional), use scope `metrics:write`.
 
-Quick verification (after variables are set and deployed):
+### Quick setup with automation
+
+If you keep the latest secrets in the local `secrets/` directory, you can populate all required Vercel env vars automatically:
+
+```bash
+npm run setup:vercel -- --project starlink-performance --team digitalpros-projects
+```
+
+The script reads `secrets/grafana_env.txt` and `secrets/vercel_blob_token.txt`, then upserts the corresponding variables via the Vercel API. Finish with `npm run deploy` to roll out the changes.
+
+### Manual verification
+
+After variables are set and deployed:
 - Health: `GET /api/ping` → `{ ok: true, now: ... }`
 - PromQL instant: `GET /api/promql?query=up`
 - PromQL range: `GET /api/promql?query=up&start=<unix>&end=<unix>&step=30`
@@ -82,7 +94,7 @@ You can deploy from the command line (CI-friendly):
 
 ```bash
 # optional: set a permanent alias for the production deployment
-export VERCEL_ALIAS=levante-performance-digitalpros-projects.vercel.app
+export VERCEL_ALIAS=starlink-performance-digitalpros-projects.vercel.app
 
 # deploy (build → link → deploy → alias)
 npm run deploy
@@ -97,6 +109,16 @@ What the script does:
 Vercel config:
 - `vercel.json` sends `/api/*` to serverless functions.
 - `/` and all other paths serve the static site from `public/`.
+
+### Migrating benchmark history after a project rename
+
+Each Vercel project gets its own Blob storage bucket. When you rename or clone a project, migrate the benchmark overlays from the previous deployment so the UI keeps showing historical runs:
+
+```bash
+npm run bench:migrate -- --source https://starlink-performance.vercel.app --dest https://starlink-performance-digitalpros-projects.vercel.app
+```
+
+Add `--dry-run` to inspect what would be transferred without uploading.
 
 ---
 

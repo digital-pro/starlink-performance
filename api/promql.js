@@ -26,6 +26,11 @@ export default async function handler(req, res) {
       headers['Authorization'] = `Basic ${basic}`;
     }
 
+    const scopeId = process.env.PROM_SCOPE_ID || process.env.GRAFANA_SCOPE_ID || process.env.PROM_USER;
+    if (scopeId && !headers['X-Scope-OrgID']) {
+      headers['X-Scope-OrgID'] = scopeId;
+    }
+
     // Normalize to include /api/v1 if caller passed base without it
     const apiBase = /\/api\/v1$/.test(baseUrl) ? baseUrl : `${baseUrl.replace(/\/$/, '')}/api/v1`;
 

@@ -15,7 +15,7 @@ async function run(cmd) {
   try {
     await run('npm run build');
 
-    const projectName = process.env.VERCEL_PROJECT_NAME || 'levante-performance';
+    const projectName = process.env.VERCEL_PROJECT_NAME || 'starlink-performance';
     const scope = process.env.VERCEL_SCOPE ? ` --scope ${process.env.VERCEL_SCOPE}` : '';
     const token = process.env.VERCEL_TOKEN ? ` --token ${process.env.VERCEL_TOKEN}` : '';
     await run(`npx -y vercel link --yes --project ${projectName}${scope}${token}`);
@@ -26,7 +26,7 @@ async function run(cmd) {
     const url = match ? match[0] : null;
     if (url) {
       console.log(`\nDeployed: ${url}\n`);
-      const alias = process.env.VERCEL_ALIAS || 'levante-performance-digitalpros-projects.vercel.app';
+      const alias = process.env.VERCEL_ALIAS || 'starlink-performance-digitalpros-projects.vercel.app';
       try {
         await run(`npx -y vercel alias set ${url} ${alias}${token}`);
         console.log(`\nAliased to: https://${alias}\n`);

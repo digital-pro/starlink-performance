@@ -10,6 +10,8 @@
     "preview": "npx http-server public -p 5175 -c-1",
     "dev:vue": "npm run dev -w @levante/vue-dashboard",
     "deploy": "node scripts/deploy.mjs",
+    "setup:vercel": "node scripts/bootstrap-vercel.mjs",
+    "bench:migrate": "node scripts/migrate-benchmarks.mjs",
     "prom:start": "bash /home/djc/levante/levante-performance/deployment/run-wsl-prom.sh --instance ${INSTANCE_ID} --starlink ${STARLINK_TARGET:-127.0.0.1:9817} --bg",
     "prom:stop": "pkill -f '/home/djc/levante/levante-performance/logs/prometheus/prometheus' || true",
     "prom:logs": "tail -n 200 /home/djc/levante/levante-performance/logs/prometheus.out || true",
