@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { exec as execCb } from 'child_process';
 import { promisify } from 'util';
+import { spawn } from 'child_process';
 const exec = promisify(execCb);
 
 const __filename = fileURLToPath(import.meta.url);
@@ -163,6 +164,80 @@ function deriveProvider() {
   return process.env.PROVIDER || process.env.NET_PROVIDER || process.env.NETWORK_PROVIDER || undefined;
 }
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function isServerUp(baseUrl) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1000);
+    const res = await fetch(baseUrl, { signal: controller.signal });
+    clearTimeout(timeout);
+    return res.ok || (res.status >= 200 && res.status < 500);
+  } catch {
+    return false;
+  }
+}
+
+async function waitForServer(baseUrl, retries, delayMs, onEarlyExit) {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    if (await isServerUp(baseUrl)) return true;
+    if (onEarlyExit?.()) return false;
+    await sleep(delayMs);
+  }
+  return false;
+}
+
+async function ensureDevServer(projectRoot, baseUrl) {
+  const skip = String(process.env.SKIP_AUTOSTART_DEV_SERVER || '').toLowerCase() === '1';
+  if (skip) {
+    return { started: false, async stop() {} };
+  }
+
+  if (await isServerUp(baseUrl)) {
+    return { started: false, async stop() {} };
+  }
+
+  const url = new URL(baseUrl);
+  const port = url.port || '8080';
+  console.log(`[bench] Starting task launcher dev server on port ${port} for ${baseUrl}...`);
+
+  const child = spawn(
+    'npx',
+    ['webpack', 'serve', '--mode', 'development', '--port', port],
+    {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: process.platform === 'win32'
+    }
+  );
+
+  let exited = false;
+  let exitCode = null;
+  child.once('exit', (code) => {
+    exited = true;
+    exitCode = code;
+  });
+  child.stdout?.on('data', data => process.stdout.write(`[launcher] ${data}`));
+  child.stderr?.on('data', data => process.stderr.write(`[launcher] ${data}`));
+
+  const ready = await waitForServer(baseUrl, 60, 1000, () => exited);
+  if (!ready) {
+    child.kill(process.platform === 'win32' ? 'SIGINT' : 'SIGTERM');
+    const reason = exited ? ` (exited with code ${exitCode})` : '';
+    throw new Error(`Task launcher dev server failed to start${reason}`);
+  }
+
+  return {
+    started: true,
+    async stop() {
+      console.log('[bench] Shutting down auto-started dev server...');
+      if (child.killed || exited) return;
+      child.kill(process.platform === 'win32' ? 'SIGINT' : 'SIGTERM');
+      await new Promise(resolve => child.once('exit', resolve));
+    }
+  };
+}
+
 async function appendRunRecord(record) {
   const arr = await readJsonArray(runsJsonPath);
   arr.push(record);
@@ -300,8 +375,12 @@ async function main() {
   const only = process.argv.slice(2).find((a) => a && !a.startsWith('--'));
   await ensureTimingFile();
   const projectRoot = await resolveProjectRoot();
-  const specsDir = path.join(projectRoot, 'cypress', 'e2e');
-  const allSpecs = await collectSpecs(specsDir);
+  const baseUrl = process.env.CYPRESS_BASE_URL || 'http://localhost:8080';
+  const devServer = await ensureDevServer(projectRoot, baseUrl);
+
+  try {
+    const specsDir = path.join(projectRoot, 'cypress', 'e2e');
+    const allSpecs = await collectSpecs(specsDir);
   console.log(`[bench] Discovered ${allSpecs.length} spec files under ${specsDir}`);
   const cypressLib = await loadCypressFromProject(projectRoot);
 
@@ -343,6 +422,11 @@ async function main() {
   if (hb) clearInterval(hb);
   await pushAllRunsNow();
   console.log('\nAll done. Results appended to cypress/timing/runs.json');
+  } finally {
+    if (devServer.started) {
+      await devServer.stop();
+    }
+  }
 }
 
 main().catch((e) => {

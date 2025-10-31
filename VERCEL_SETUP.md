@@ -4,52 +4,45 @@
 
 Go to: https://vercel.com/digitalpros-projects/starlink-performance/settings/environment-variables
 
-Add these 3 environment variables:
+Add these environment variables:
 
 ---
 
-### 1. GCP_PROJECT_ID
+### 1. PROM_URL (required)
 
-**Value:**
-```
-hs-levante-admin-dev
-```
+**Value:** your Grafana Cloud Prometheus endpoint (e.g. `https://prometheus-prod-xx.grafana.net/api/v1`)
 
 ---
 
-### 2. GCP_BUCKET_NAME
+### 2. Authentication for Prometheus (choose one set)
 
-**Value:**
-```
-starlink-performance-dev
-```
+- `PROM_BASIC`: `base64(username:token)`
+- or `PROM_USER` and `PROM_TOKEN`
+- or `PROM_BEARER`
 
 ---
 
-### 3. GCP_SERVICE_ACCOUNT_KEY
+### 3. Optional Dash Integrations
 
-**Value:** (Copy the entire contents of `secrets/levante-dashboard-dev-key.json`)
+| Variable | Purpose |
+|----------|---------|
+| `NETDATA_URL` / `NETDATA_HOST` | Enable Netdata proxy endpoints |
+| `NETDATA_AUTH_BASIC` / `NETDATA_BEARER` | Netdata auth options |
+| `VERCEL_ALIAS` | Alias applied by `npm run deploy` |
+| `VERCEL_BYPASS_TOKEN` | Required only if deployment protection is enabled |
 
-⚠️ **Important:** Copy the ENTIRE JSON file including the braces `{` and `}`.
+---
 
-The service account key is located at:
-```
-/home/david/levante/starlink-performance/secrets/levante-dashboard-dev-key.json
-```
+## 📦 Benchmark Storage
 
-You can view it with:
-```bash
-cat secrets/levante-dashboard-dev-key.json
-```
-
-Then copy the entire output and paste it into Vercel as the value for `GCP_SERVICE_ACCOUNT_KEY`.
+Benchmark uploads are now persisted in Vercel Blob storage. No Google Cloud project or service account variables are required. The `/api/bench-push` function writes to Blob directly via `@vercel/blob`, and `/api/bench-runs` reads the same data.
 
 ---
 
 ## ✅ After Adding Variables
 
-1. Click "Save" for each variable
-2. Deploy: `./deploy.sh --prod`
+1. Save each variable
+2. Deploy with `npm run deploy`
 3. Test the API:
    - Upload: `POST https://starlink-performance.vercel.app/api/bench-push`
    - Read: `GET https://starlink-performance.vercel.app/api/bench-runs`

@@ -143,8 +143,8 @@ try {
 ## 🐛 Troubleshooting
 
 ### "Error pushing to dashboard"
-- Check that GCP environment variables are set in Vercel
-- Verify bucket permissions: `gsutil iam get gs://starlink-performance-dev`
+- Ensure deployment protection is disabled or provide `VERCEL_BYPASS_TOKEN`
+- Check Vercel function logs for `bench-push` errors
 
 ### "No runs found in runs.ndjson"
 - Run a benchmark first: `npm run timings:one intro`
@@ -153,7 +153,7 @@ try {
 ### Vertical lines don't appear
 - Refresh the dashboard
 - Check browser console for errors
-- Verify data was pushed: Check GCS bucket for files in `benchmarks/` folder
+- Verify data was pushed: call `/api/bench-runs` or check Vercel Blob via `vercel blob list benchmarks/`
 
 ### Task launcher not reachable
 - Ensure dev server is running on port 8080

@@ -74,7 +74,7 @@ Benchmark runs are automatically pushed to the web dashboard for real-time visua
 
 - **Auto-Push**: After each task completes, `run_all_and_record.js` sends the updated `runs.json` to `/api/bench-push` (production endpoint by default)
 - **Heartbeat**: During multi-spec batches, runs are pushed every 30 seconds to keep the dashboard current
-- **Storage**: Runs are stored in Google Cloud Storage as:
+- **Storage**: Runs are persisted in Vercel Blob storage as:
   - `benchmarks/runs.json` (canonical source)
   - `benchmarks/latest.json` (pointer to latest batch)
   - `benchmarks/<timestamp>.json` (timestamped snapshots)
@@ -112,12 +112,13 @@ Benchmark runs are automatically pushed to the web dashboard for real-time visua
 
 ### Running with the dev server
 
-Ensure the app is served on 8080:
+The benchmark runner now auto-starts the task launcher dev server if nothing is listening on `http://localhost:8080`. You can opt-out (for example, if you already have a server running) by setting `SKIP_AUTOSTART_DEV_SERVER=1`.
+
+Manual start remains available:
 
 ```bash
 cd /home/djc/levante/core-tasks/task-launcher
 npx webpack serve --mode development --env dbmode=development --port 8080
-# keep this running in a terminal; run timings from another terminal
 ```
 
 ### Troubleshooting

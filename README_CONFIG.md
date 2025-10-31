@@ -1,5 +1,7 @@
 # Starlink Performance - Configuration Guide
 
+> **Update (Oct 2025):** Benchmark uploads now use Vercel Blob storage. The Google Cloud Storage setup below is retained for legacy reference and can be skipped for new deployments.
+
 This guide walks you through setting up the complete monitoring and benchmarking system for Starlink Performance.
 
 ## Table of Contents
@@ -11,7 +13,9 @@ This guide walks you through setting up the complete monitoring and benchmarking
 
 ---
 
-## Google Cloud Storage Setup
+## Google Cloud Storage Setup *(legacy)*
+
+> These steps are only needed if you continue to use the historical Google Cloud bucket. New deployments can skip to the Vercel Blob guidance below.
 
 ### Overview
 - **Bucket Name:** `starlink-performance-dev`
@@ -82,7 +86,9 @@ rm test.txt
 
 ---
 
-## Service Account Permissions
+## Service Account Permissions *(legacy)*
+
+> Only required if you are still writing to Google Cloud Storage.
 
 ### Current Service Account
 - **File Location:** `/home/david/levante/starlink-performance/secrets/levante-dashboard-dev-key.json`
@@ -109,17 +115,28 @@ const bucket = storage.bucket('starlink-performance-dev');
 
 ---
 
+## Benchmark Storage (current)
+
+Benchmark uploads now use [Vercel Blob storage](https://vercel.com/docs/storage/vercel-blob). The serverless APIs (`api/bench-push.js` and `api/bench-runs.js`) read and write blobs under the `benchmarks/` prefix, so no external bucket or service account is required.
+
+- `/api/bench-push` writes timestamped snapshots, `latest.json`, and `runs.json`
+- `/api/bench-runs` serves the in-memory cache or, if empty, reads from Blob
+- Local benchmark scripts just POST to `/api/bench-push`; Vercel handles persistence
+
+---
+
 ## Vercel Environment Variables
 
 Configure these in: https://vercel.com/digitalpros-projects/starlink-performance/settings/environment-variables
 
-### Required for GCS Access
+### Core variables
 
-| Variable Name | Value | Description |
-|--------------|-------|-------------|
-| `GCP_PROJECT_ID` | `hs-levante-admin-dev` | Google Cloud project ID |
-| `GCP_BUCKET_NAME` | `starlink-performance-dev` | Storage bucket name |
-| `GCP_SERVICE_ACCOUNT_KEY` | `<paste entire JSON>` | Service account credentials (paste entire content of `levante-dashboard-dev-key.json`) |
+| Variable Name | Description |
+|--------------|-------------|
+| `PROM_URL` | Grafana Cloud Prometheus endpoint (e.g. `https://prometheus-prod-xx.grafana.net/api/v1`) |
+| `PROM_BASIC` / `PROM_USER`+`PROM_TOKEN` / `PROM_BEARER` | One of these auth methods is required to reach Prometheus |
+| `VERCEL_BYPASS_TOKEN` | Needed only if Vercel deployment protection is enabled (used by benchmark scripts) |
+| `VERCEL_ALIAS` | Optional alias applied by `npm run deploy` |
 
 ### Optional - For Netdata Integration
 
@@ -216,22 +233,38 @@ If you can't access your "djc" space:
 
 ### Option 3: Custom Benchmarking Scripts
 
-Write benchmark data directly to GCS:
+Recommended path: POST to the `/api/bench-push` endpoint and let Vercel Blob handle storage.
 
 ```javascript
-// Example: Write benchmark results
-const { Storage } = require('@google-cloud/storage');
-const storage = new Storage();
-const bucket = storage.bucket('starlink-performance-dev');
+// Minimal example
+await fetch('https://starlink-performance.vercel.app/api/bench-push', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify([
+    {
+      task: 'custom-run',
+      start: Date.now() - 5000,
+      end: Date.now(),
+      metadata: { source: 'custom-script' }
+    }
+  ])
+});
+```
 
-const data = {
+Need direct access instead? Use `@vercel/blob` from a Vercel function or background job:
+
+```javascript
+import { put } from '@vercel/blob';
+
+const payload = {
   timestamp: new Date().toISOString(),
-  latency: 45.3,
-  bandwidth_down: 150.2,
-  bandwidth_up: 20.5
+  runs: [ /* ... */ ]
 };
 
-await bucket.file(`benchmarks/${Date.now()}.json`).save(JSON.stringify(data));
+await put(`benchmarks/${Date.now()}.json`, JSON.stringify(payload, null, 2), {
+  access: 'private',
+  contentType: 'application/json'
+});
 ```
 
 ---
@@ -285,37 +318,32 @@ npm run preview
 
 ## Quick Start Checklist
 
-- [ ] Grant service account "Storage Admin" role on `starlink-performance-dev`
-- [ ] Set CORS on bucket: `gsutil cors set cors.json gs://starlink-performance-dev`
-- [ ] Add `GCP_SERVICE_ACCOUNT_KEY` to Vercel environment variables
-- [ ] Add `GCP_PROJECT_ID` and `GCP_BUCKET_NAME` to Vercel
-- [ ] Choose monitoring: Set up Netdata OR Prometheus
-- [ ] Add monitoring credentials to Vercel environment variables
-- [ ] Redeploy: `./deploy.sh --prod`
-- [ ] Test dashboard at https://starlink-performance.vercel.app
+- [ ] Configure Prometheus environment variables (`PROM_URL` + chosen auth)
+- [ ] Optionally configure Netdata variables if using the proxy
+- [ ] (If deployment protection is on) set `VERCEL_BYPASS_TOKEN` for benchmark uploads
+- [ ] Deploy with `npm run deploy`
+- [ ] Verify `/api/promql?query=up` and `/api/bench-runs`
+- [ ] Spot-check the dashboard at https://starlink-performance.vercel.app
 
 ---
 
 ## Troubleshooting
 
-### "AccessDeniedException" when accessing bucket
-- Grant service account proper roles (see Step 1)
-- Wait 1-2 minutes for permissions to propagate
-
-### "CORS error" in browser console
-- Run `gsutil cors set cors.json gs://starlink-performance-dev`
-- Verify domain matches in `cors.json`
+### Benchmark overlays not updating
+- Ensure deployment protection is disabled or provide `VERCEL_BYPASS_TOKEN` where benchmarks run
+- Confirm `/api/bench-push` responds with `{ ok: true }`
+- Inspect Vercel logs for `bench-push` failures
 
 ### "N/A" values in dashboard
-- Check Vercel environment variables are set
-- Check Netdata/Prometheus is running and accessible
-- Check API endpoints directly (see Verify Deployment)
-- Check Vercel function logs: https://vercel.com/digitalpros-projects/starlink-performance/logs
+- Check Vercel environment variables
+- Verify Prometheus (and Netdata, if enabled) endpoints respond
+- Call the API endpoints directly (see Verify Deployment)
+- Inspect Vercel function logs: https://vercel.com/digitalpros-projects/starlink-performance/logs
 
-### Service account key not found in Vercel
-- Copy entire JSON content (including `{` and `}`)
-- Paste as single-line or multi-line in Vercel env vars
-- Redeploy after adding
+### Local benchmark script fails to reach dev server
+- The script auto-starts the task launcher dev server on port 8080; review console output for startup errors
+- Set `SKIP_AUTOSTART_DEV_SERVER=1` to manage the server manually
+- Override `CYPRESS_BASE_URL` when targeting a custom host/port
 
 ---
 
