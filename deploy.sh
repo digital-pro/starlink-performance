@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Deployment script for Levante Performance Dashboard
+# Deployment script for Starlink Performance Dashboard
 # Usage: ./deploy.sh [--prod]
 
 set -e
