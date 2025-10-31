@@ -157,6 +157,29 @@ After variables are set and deployed:
 - PromQL range: `GET /api/promql?query=up&start=<unix>&end=<unix>&step=30`
 - Series discovery: `GET /api/promql?endpoint=series&match[]=starlink_*`
 
+### Refreshing Grafana credentials
+
+Access Policy tokens in Grafana Cloud expire or get rotated. When the dashboard starts returning 401s or `authentication error: invalid token`, refresh the secrets and redeploy:
+
+1. Grafana Cloud → **Access Policies** → select a policy with `metrics:read` → **Add token**. Copy the token immediately.
+2. Update `secrets/grafana_env.txt` on this machine:
+   ```env
+   PROM_URL=https://prometheus-prod-36-prod-us-west-0.grafana.net/api/prom
+   PROM_USER=2743807
+   PROM_TOKEN=<new_token>
+   PROM_BASIC=<base64 "2743807:<new_token>">
+   ```
+3. Sync the new values to Vercel:
+   ```bash
+   npm run setup:vercel -- --project starlink-performance --team digitalpros-projects
+   ```
+4. Redeploy and verify:
+   ```bash
+   npm run deploy
+   curl -s https://starlink-performance-digitalpros-projects.vercel.app/api/promql?query=up
+   ```
+   A 200 response with data confirms the proxy is re-authenticated.
+
 ---
 
 ## Deploy to Vercel
@@ -418,6 +441,20 @@ npm run restart:exporter
 # Restart exporter and Prometheus stack
 npm run restart:stack
 ```
+
+`restart:stack` is the fastest way to recover from a "no data" dashboard. It:
+- rebuilds & launches the Starlink exporter on :9817
+- restarts the Wi‑Fi exporter on :9818
+- restarts the helper Prometheus (WSL) process and replays the WAL to Grafana Cloud
+
+After running it, confirm everything is healthy:
+
+```bash
+npm run exporter:check        # should print starlink_* metrics
+npm run prom:targets | jq .   # starlink target health = "up"
+curl -s https://starlink-performance-digitalpros-projects.vercel.app/api/promql?query=starlink_down_mbps
+```
+If the PromQL call returns values, Grafana is receiving data and the dashboard will update within the next scrape interval.
 
 Notes
 - The helper uses `deployment/run-wsl-prom.sh`, which reads your write token from `secrets/grafana_write_token.txt` and writes config to `deployment/prom-wsl.yml`.

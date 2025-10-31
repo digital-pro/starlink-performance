@@ -159,9 +159,22 @@ Configure these in: https://vercel.com/digitalpros-projects/starlink-performance
 
 ### After Setting Variables
 
-After adding/changing environment variables:
-1. Redeploy: `./deploy.sh --prod`
-2. Or use Vercel dashboard: **Deployments** → **Redeploy**
+After updating Grafana or Blob secrets locally:
+
+1. Save the latest credentials in `secrets/grafana_env.txt` (and `secrets/vercel_blob_token.txt` if needed).
+2. Push them to Vercel:
+   ```bash
+   npm run setup:vercel -- --project starlink-performance --team digitalpros-projects
+   ```
+3. Redeploy so the new env vars take effect:
+   ```bash
+   npm run deploy
+   ```
+4. Sanity check:
+   ```bash
+   curl -s https://starlink-performance-digitalpros-projects.vercel.app/api/promql?query=up
+   ```
+   A 200 response with data confirms the proxy is working.
 
 ---
 
@@ -355,4 +368,27 @@ npm run preview
 - **Grafana Cloud:** https://grafana.com
 
 For issues, check Vercel function logs and GCP Cloud Logging.
+
+---
+
+## Operations checklist (when the dashboard shows `N/A` everywhere)
+
+1. Restart the entire pipeline:
+   ```bash
+   npm run restart:stack
+   ```
+   This rebuilds the Starlink exporter, restarts the Wi‑Fi exporter, and relaunches the helper Prometheus with remote_write enabled.
+2. Confirm the exporter is serving metrics:
+   ```bash
+   npm run exporter:check
+   ```
+3. Confirm Prometheus sees the `starlink` target and it is `"health": "up"`:
+   ```bash
+   npm run prom:targets | jq .
+   ```
+4. Verify Grafana is receiving samples:
+   ```bash
+   curl -s https://starlink-performance-digitalpros-projects.vercel.app/api/promql?query=starlink_down_mbps
+   ```
+   A JSON response with numeric values indicates the dashboard will repopulate on the next refresh.
 
