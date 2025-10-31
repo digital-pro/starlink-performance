@@ -32,7 +32,7 @@ Implemented **smart event detection** that infers Starlink events by analyzing m
 ## Implementation
 
 ### Smart Event Detection Algorithm
-Modified `/home/djc/levante/levante-performance/apps/vue-dashboard/src/App.vue`:
+Modified `/home/djc/levante/starlink-performance/apps/vue-dashboard/src/App.vue`:
 
 The `loadStarlinkEvents()` function now:
 1. Fetches 5 key metrics over the selected time range:
@@ -85,10 +85,10 @@ curl -s "http://localhost:9090/api/v1/query?query=starlink_dish_uplink_throughpu
 ```bash
 # Rebuild exporter with new code
 cd /home/djc/starlink_exporter
-go build -o /home/djc/levante/levante-performance/logs/starlink_exporter ./cmd/starlink_exporter
+go build -o /home/djc/levante/starlink-performance/logs/starlink_exporter ./cmd/starlink_exporter
 
 # Restart monitoring stack
-cd /home/djc/levante/levante-performance
+cd /home/djc/levante/starlink-performance
 npm run restart:stack
 
 # Deploy updated dashboard
@@ -124,9 +124,9 @@ Potential improvements to event detection:
 
 ## Files Modified
 
-- `/home/djc/levante/levante-performance/apps/vue-dashboard/src/App.vue` - Implemented smart event detection in `loadStarlinkEvents()`
-- `/home/djc/levante/levante-performance/README.md` - Documented the feature
-- `/home/djc/levante/levante-performance/STARLINK_HISTORY_ENHANCEMENT.md` - This document
+- `/home/djc/levante/starlink-performance/apps/vue-dashboard/src/App.vue` - Implemented smart event detection in `loadStarlinkEvents()`
+- `/home/djc/levante/starlink-performance/README.md` - Documented the feature
+- `/home/djc/levante/starlink-performance/STARLINK_HISTORY_ENHANCEMENT.md` - This document
 
 ## Summary
 

@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const timingDir = path.join(__dirname);
 const runsJsonPath = path.join(timingDir, 'runs.json');
 const runsNdjsonPath = path.join(timingDir, 'runs.ndjson');
-const DEFAULT_PUSH_URL = process.env.DASHBOARD_PUSH_URL || 'https://levante-performance-digitalpros-projects.vercel.app/api/bench-push';
+const DEFAULT_PUSH_URL = process.env.DASHBOARD_PUSH_URL || 'https://starlink-performance-digitalpros-projects.vercel.app/api/bench-push';
 
 async function pathExists(p) {
   try {
@@ -50,7 +50,7 @@ async function resolveProjectRoot() {
     cur = next;
   }
   const candidates = [
-    // typical mono-repo layout: levante-performance/task-benchmarks → ../../core-tasks/task-launcher
+    // typical mono-repo layout: starlink-performance/task-benchmarks → ../../core-tasks/task-launcher
     ...ancestors.map(a => path.resolve(a, 'core-tasks', 'task-launcher')),
     // direct sibling fallback
     path.resolve(__dirname, '..', '..', 'task-launcher'),
@@ -169,9 +169,13 @@ async function appendRunRecord(record) {
   await writeJsonArray(runsJsonPath, arr);
   // Push to dashboard for live overlays (best-effort)
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (process.env.VERCEL_BYPASS_TOKEN) {
+      headers['x-vercel-protection-bypass'] = process.env.VERCEL_BYPASS_TOKEN;
+    }
     await fetch(DEFAULT_PUSH_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(arr)
     }).catch(() => {});
   } catch {}
@@ -182,9 +186,13 @@ async function appendRunRecord(record) {
 async function pushAllRunsNow() {
   try {
     const arr = await readJsonArray(runsJsonPath);
+    const headers = { 'Content-Type': 'application/json' };
+    if (process.env.VERCEL_BYPASS_TOKEN) {
+      headers['x-vercel-protection-bypass'] = process.env.VERCEL_BYPASS_TOKEN;
+    }
     await fetch(DEFAULT_PUSH_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(arr)
     }).catch(() => {});
   } catch {}

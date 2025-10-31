@@ -1,7 +1,7 @@
 <template>
   <main style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, sans-serif; padding: 24px; max-width: 1200px; margin: 0 auto;">
     <header style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap: wrap;">
-      <h1 style="margin:0; font-size: 24px;">Levante Performance</h1>
+      <h1 style="margin:0; font-size: 24px;">Starlink Performance</h1>
       <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap; color:#667;">
         <small>Data Source: Prometheus (Grafana Cloud)</small>
         <a href="https://levanteperformance.grafana.net/d/ab8a8fa9-8d9c-47df-928b-9db5a89a5bca/starlink-performance-10-25?orgId=1&from=now-6h&to=now&timezone=browser&refresh=30s&showCategory=Panel%20options" target="_blank" rel="noopener noreferrer" style="padding:8px 12px; border:1px solid #444; background:#222; color:white; border-radius:8px; text-decoration:none;">Open in Grafana</a>
@@ -280,7 +280,7 @@ const gpsLongitude = ref<number | null>(null);
 const showMapModal = ref(false);
 // bucket info removed
 // Initialize rangeSeconds from localStorage, default to 1 hour
-const storedRange = localStorage.getItem('levante_rangeSeconds');
+const storedRange = localStorage.getItem('starlink_rangeSeconds');
 const rangeSeconds = ref<number>(storedRange ? Number(storedRange) : 3600);
 
 // Baseline traffic (Mbps) to subtract from benchmark calculations
@@ -315,13 +315,20 @@ const metricCards = [
 ] as const;
 
 function format3(value: number | string): string | number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value.toFixed(3);
+  if (typeof value === 'number' && Number.isFinite(value)) return value.toFixed(2);
   if (typeof value === 'string') {
     const n = Number(value);
-    if (Number.isFinite(n)) return n.toFixed(3);
+    if (Number.isFinite(n)) return n.toFixed(2);
+    return value;
   }
   return value;
 }
+
+const formatTooltipValue = (value: number | string): string => {
+  const num = Number(value);
+  if (Number.isFinite(num)) return num.toFixed(2);
+  return typeof value === 'string' ? value : '';
+};
 
 function formatGpsLocation(): string {
   if (gpsLatitude.value !== null && gpsLongitude.value !== null) {
@@ -953,7 +960,7 @@ const latencyOption = computed(() => {
   });
 
   return {
-    tooltip: { trigger: 'axis' },
+    tooltip: { trigger: 'axis', valueFormatter: formatTooltipValue },
     grid: { left: 40, right: 80, top: 64, bottom: 40 },
     legend: { top: 6, data: ['Latency', 'Packet Loss (%)'] },
     xAxis: { 
@@ -1040,13 +1047,14 @@ const bandwidthOption = computed(() => {
     });
 
   // Restore legend selection from localStorage
-  const storedLegend = localStorage.getItem('levante_bandwidthLegend');
+  const storedLegend = localStorage.getItem('starlink_bandwidthLegend');
   const legendSelected = storedLegend ? JSON.parse(storedLegend) : undefined;
 
   return ({
     tooltip: {
       trigger: 'axis',
-      axisPointer: { type: 'cross' }
+      axisPointer: { type: 'cross' },
+      valueFormatter: formatTooltipValue
     },
     grid: { left: 60, right: 100, top: 64, bottom: 40 },
     legend: { 
@@ -1159,7 +1167,7 @@ const anomalyOption = computed(() => {
   }
 
   return {
-    tooltip: { trigger: 'item' },
+    tooltip: { trigger: 'item', valueFormatter: formatTooltipValue },
     grid: { left: 40, right: 40, top: 40, bottom: 40 },
     legend: { top: 6, data: ['Anomaly Rate (%)'] },
     xAxis: { 
@@ -1223,7 +1231,7 @@ const snrOption = computed(() => {
   const now = Date.now();
   const windowStart = now - (rangeSeconds.value * 1000);
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
     yAxis: { type: 'value', name: 'dB', min: 0 },
@@ -1243,7 +1251,7 @@ const dishStateOption = computed(() => {
   const now = Date.now();
   const windowStart = now - (rangeSeconds.value * 1000);
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
     yAxis: { type: 'value', name: 'State', min: 0, max: 3 },
@@ -1263,7 +1271,7 @@ const backupBeamOption = computed(() => {
   const now = Date.now();
   const windowStart = now - (rangeSeconds.value * 1000);
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
     yAxis: { type: 'value', name: 'Backup', min: 0, max: 1 },
@@ -1283,7 +1291,7 @@ const slotEndOption = computed(() => {
   const now = Date.now();
   const windowStart = now - (rangeSeconds.value * 1000);
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
     yAxis: { type: 'value', name: 's' },
@@ -1303,7 +1311,7 @@ const azimuthOption = computed(() => {
   const now = Date.now();
   const windowStart = now - (rangeSeconds.value * 1000);
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
     yAxis: { type: 'value', name: 'deg' },
@@ -1323,7 +1331,7 @@ const elevationOption = computed(() => {
   const now = Date.now();
   const windowStart = now - (rangeSeconds.value * 1000);
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
     yAxis: { type: 'value', name: 'deg' },
@@ -1343,7 +1351,7 @@ const firstSlotOption = computed(() => {
   const now = Date.now();
   const windowStart = now - (rangeSeconds.value * 1000);
   return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
     yAxis: { type: 'value', name: 's' },
@@ -1386,13 +1394,13 @@ function periodicityStyle(detected: boolean) {
 function onBandwidthLegendChange(event: any) {
   // Save legend selection state to localStorage
   if (event && event.selected) {
-    localStorage.setItem('levante_bandwidthLegend', JSON.stringify(event.selected));
+    localStorage.setItem('starlink_bandwidthLegend', JSON.stringify(event.selected));
   }
 }
 
 // Watch rangeSeconds and save to localStorage
 watch(rangeSeconds, (newVal) => {
-  localStorage.setItem('levante_rangeSeconds', String(newVal));
+  localStorage.setItem('starlink_rangeSeconds', String(newVal));
 });
 
 onMounted(() => {

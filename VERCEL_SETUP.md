@@ -2,7 +2,7 @@
 
 ## 📋 Quick Setup Instructions
 
-Go to: https://vercel.com/digitalpros-projects/levante-performance/settings/environment-variables
+Go to: https://vercel.com/digitalpros-projects/starlink-performance/settings/environment-variables
 
 Add these 3 environment variables:
 
@@ -21,7 +21,7 @@ hs-levante-admin-dev
 
 **Value:**
 ```
-levante-performance-dev
+starlink-performance-dev
 ```
 
 ---
@@ -34,7 +34,7 @@ levante-performance-dev
 
 The service account key is located at:
 ```
-/home/david/levante/levante-performance/secrets/levante-dashboard-dev-key.json
+/home/david/levante/starlink-performance/secrets/levante-dashboard-dev-key.json
 ```
 
 You can view it with:
@@ -51,15 +51,15 @@ Then copy the entire output and paste it into Vercel as the value for `GCP_SERVI
 1. Click "Save" for each variable
 2. Deploy: `./deploy.sh --prod`
 3. Test the API:
-   - Upload: `POST https://levante-performance.vercel.app/api/bench-push`
-   - Read: `GET https://levante-performance.vercel.app/api/bench-runs`
+   - Upload: `POST https://starlink-performance.vercel.app/api/bench-push`
+   - Read: `GET https://starlink-performance.vercel.app/api/bench-runs`
 
 ---
 
 ## 🧪 Test Benchmark Upload
 
 ```bash
-curl -X POST https://levante-performance.vercel.app/api/bench-push \
+curl -X POST https://starlink-performance.vercel.app/api/bench-push \
   -H "Content-Type: application/json" \
   -d '[
     {

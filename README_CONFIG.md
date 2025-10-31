@@ -1,6 +1,6 @@
-# Levante Performance - Configuration Guide
+# Starlink Performance - Configuration Guide
 
-This guide walks you through setting up the complete monitoring and benchmarking system for Levante Performance.
+This guide walks you through setting up the complete monitoring and benchmarking system for Starlink Performance.
 
 ## Table of Contents
 1. [Google Cloud Storage Setup](#google-cloud-storage-setup)
@@ -14,7 +14,7 @@ This guide walks you through setting up the complete monitoring and benchmarking
 ## Google Cloud Storage Setup
 
 ### Overview
-- **Bucket Name:** `levante-performance-dev`
+- **Bucket Name:** `starlink-performance-dev`
 - **Project:** `hs-levante-admin-dev`
 - **Service Account:** `levante-dashboard-writer-dev@hs-levante-admin-dev.iam.gserviceaccount.com`
 - **Purpose:** Store benchmark data and performance metrics
@@ -22,7 +22,7 @@ This guide walks you through setting up the complete monitoring and benchmarking
 ### Step 1: Grant Service Account Permissions
 
 1. Go to [Google Cloud Console - Storage](https://console.cloud.google.com/storage/browser)
-2. Select your bucket: `levante-performance-dev`
+2. Select your bucket: `starlink-performance-dev`
 3. Click the **Permissions** tab
 4. Click **Grant Access**
 5. Add the service account with these roles:
@@ -55,8 +55,8 @@ If you see "Public access is prevented" warning:
 After granting the service account **Storage Admin** role, run:
 
 ```bash
-cd /home/david/levante/levante-performance
-gsutil cors set cors.json gs://levante-performance-dev
+cd /home/david/levante/starlink-performance
+gsutil cors set cors.json gs://starlink-performance-dev
 ```
 
 Or set it manually in the Cloud Console:
@@ -69,14 +69,14 @@ Or set it manually in the Cloud Console:
 
 ```bash
 # Check bucket permissions
-gsutil iam get gs://levante-performance-dev
+gsutil iam get gs://starlink-performance-dev
 
 # Check CORS configuration
-gsutil cors get gs://levante-performance-dev
+gsutil cors get gs://starlink-performance-dev
 
 # Test file upload
 echo "test" > test.txt
-gsutil cp test.txt gs://levante-performance-dev/
+gsutil cp test.txt gs://starlink-performance-dev/
 rm test.txt
 ```
 
@@ -85,7 +85,7 @@ rm test.txt
 ## Service Account Permissions
 
 ### Current Service Account
-- **File Location:** `/home/david/levante/levante-performance/secrets/levante-dashboard-dev-key.json`
+- **File Location:** `/home/david/levante/starlink-performance/secrets/levante-dashboard-dev-key.json`
 - **Email:** `levante-dashboard-writer-dev@hs-levante-admin-dev.iam.gserviceaccount.com`
 - **Project:** `hs-levante-admin-dev`
 
@@ -104,21 +104,21 @@ const storage = new Storage({
   credentials: JSON.parse(process.env.GCP_SERVICE_ACCOUNT_KEY)
 });
 
-const bucket = storage.bucket('levante-performance-dev');
+const bucket = storage.bucket('starlink-performance-dev');
 ```
 
 ---
 
 ## Vercel Environment Variables
 
-Configure these in: https://vercel.com/digitalpros-projects/levante-performance/settings/environment-variables
+Configure these in: https://vercel.com/digitalpros-projects/starlink-performance/settings/environment-variables
 
 ### Required for GCS Access
 
 | Variable Name | Value | Description |
 |--------------|-------|-------------|
 | `GCP_PROJECT_ID` | `hs-levante-admin-dev` | Google Cloud project ID |
-| `GCP_BUCKET_NAME` | `levante-performance-dev` | Storage bucket name |
+| `GCP_BUCKET_NAME` | `starlink-performance-dev` | Storage bucket name |
 | `GCP_SERVICE_ACCOUNT_KEY` | `<paste entire JSON>` | Service account credentials (paste entire content of `levante-dashboard-dev-key.json`) |
 
 ### Optional - For Netdata Integration
@@ -222,7 +222,7 @@ Write benchmark data directly to GCS:
 // Example: Write benchmark results
 const { Storage } = require('@google-cloud/storage');
 const storage = new Storage();
-const bucket = storage.bucket('levante-performance-dev');
+const bucket = storage.bucket('starlink-performance-dev');
 
 const data = {
   timestamp: new Date().toISOString(),
@@ -276,23 +276,23 @@ npm run preview
 
 ### Verify Deployment
 
-1. Check main URL: https://levante-performance.vercel.app
+1. Check main URL: https://starlink-performance.vercel.app
 2. Test API endpoints:
-   - https://levante-performance.vercel.app/api/netdata?chart=starlink.ping&after=-300&points=10
-   - https://levante-performance.vercel.app/api/promql?query=up
+   - https://starlink-performance.vercel.app/api/netdata?chart=starlink.ping&after=-300&points=10
+   - https://starlink-performance.vercel.app/api/promql?query=up
 
 ---
 
 ## Quick Start Checklist
 
-- [ ] Grant service account "Storage Admin" role on `levante-performance-dev`
-- [ ] Set CORS on bucket: `gsutil cors set cors.json gs://levante-performance-dev`
+- [ ] Grant service account "Storage Admin" role on `starlink-performance-dev`
+- [ ] Set CORS on bucket: `gsutil cors set cors.json gs://starlink-performance-dev`
 - [ ] Add `GCP_SERVICE_ACCOUNT_KEY` to Vercel environment variables
 - [ ] Add `GCP_PROJECT_ID` and `GCP_BUCKET_NAME` to Vercel
 - [ ] Choose monitoring: Set up Netdata OR Prometheus
 - [ ] Add monitoring credentials to Vercel environment variables
 - [ ] Redeploy: `./deploy.sh --prod`
-- [ ] Test dashboard at https://levante-performance.vercel.app
+- [ ] Test dashboard at https://starlink-performance.vercel.app
 
 ---
 
@@ -303,14 +303,14 @@ npm run preview
 - Wait 1-2 minutes for permissions to propagate
 
 ### "CORS error" in browser console
-- Run `gsutil cors set cors.json gs://levante-performance-dev`
+- Run `gsutil cors set cors.json gs://starlink-performance-dev`
 - Verify domain matches in `cors.json`
 
 ### "N/A" values in dashboard
 - Check Vercel environment variables are set
 - Check Netdata/Prometheus is running and accessible
 - Check API endpoints directly (see Verify Deployment)
-- Check Vercel function logs: https://vercel.com/digitalpros-projects/levante-performance/logs
+- Check Vercel function logs: https://vercel.com/digitalpros-projects/starlink-performance/logs
 
 ### Service account key not found in Vercel
 - Copy entire JSON content (including `{` and `}`)
@@ -321,8 +321,8 @@ npm run preview
 
 ## Support & Resources
 
-- **Vercel Dashboard:** https://vercel.com/digitalpros-projects/levante-performance
-- **GCP Console:** https://console.cloud.google.com/storage/browser/levante-performance-dev
+- **Vercel Dashboard:** https://vercel.com/digitalpros-projects/starlink-performance
+- **GCP Console:** https://console.cloud.google.com/storage/browser/starlink-performance-dev
 - **Netdata Cloud:** https://app.netdata.cloud
 - **Grafana Cloud:** https://grafana.com
 

@@ -30,7 +30,7 @@ console.log(`📊 Prometheus URL: ${PROM_URL}\n`);
 
 async function handleAiCorrelate(req, res) {
   try {
-    const handlerPath = join(ROOT_DIR, 'api', 'ai-correlate.mjs');
+    const handlerPath = join(ROOT_DIR, 'api', 'ai-correlate.js');
     const handlerUrl = pathToFileURL(handlerPath).href;
     const handlerModule = await import(handlerUrl);
     const handler = handlerModule.default || handlerModule;
@@ -70,7 +70,7 @@ async function handleAiCorrelate(req, res) {
 
 async function handlePromql(req, res) {
   try {
-    const handlerPath = join(ROOT_DIR, 'api', 'promql.mjs');
+    const handlerPath = join(ROOT_DIR, 'api', 'promql.js');
     const handlerUrl = pathToFileURL(handlerPath).href;
     const handlerModule = await import(handlerUrl);
     const handler = handlerModule.default || handlerModule;
@@ -110,7 +110,7 @@ async function handlePromql(req, res) {
 
 async function handleBenchRuns(req, res) {
   try {
-    const handlerPath = join(ROOT_DIR, 'api', 'bench-runs.mjs');
+    const handlerPath = join(ROOT_DIR, 'api', 'bench-runs.js');
     const handlerUrl = pathToFileURL(handlerPath).href;
     const handlerModule = await import(handlerUrl);
     const handler = handlerModule.default || handlerModule;

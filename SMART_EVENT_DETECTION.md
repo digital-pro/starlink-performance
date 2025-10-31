@@ -132,6 +132,6 @@ Key function: `loadStarlinkEvents()` in `/apps/vue-dashboard/src/App.vue`
 
 ## Deployed
 
-✅ Live at: https://levante-performance-digitalpros-projects.vercel.app
+✅ Live at: https://starlink-performance-digitalpros-projects.vercel.app
 
 Check the browser console for: `📡 Detected X Starlink events in last Ymin`

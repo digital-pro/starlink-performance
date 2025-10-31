@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     })).filter(x => x.start && x.end);
 
     // Write to Google Cloud Storage
-    const bucketName = process.env.GCP_BUCKET_NAME || 'levante-performance-dev';
+    const bucketName = process.env.GCP_BUCKET_NAME || 'starlink-performance-dev';
     const storage = getStorage();
     const bucket = storage.bucket(bucketName);
     const timestamp = Date.now();

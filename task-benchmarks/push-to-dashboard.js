@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Push benchmark timing data to the Levante Performance dashboard
+ * Push benchmark timing data to the Starlink Performance dashboard
  * Reads from runs.ndjson and POSTs to /api/bench-push
  */
 
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const API_URL = process.env.DASHBOARD_URL || 'https://levante-performance.vercel.app';
+const API_URL = process.env.DASHBOARD_URL || 'https://starlink-performance.vercel.app';
 
 async function readNdjson() {
   const ndjsonPath = path.join(__dirname, 'runs.ndjson');
@@ -47,10 +47,15 @@ async function pushToDashboard(runs) {
 
   console.log(`Pushing ${payload.length} benchmark runs to ${url}...`);
   
+  const headers = { 'Content-Type': 'application/json' };
+  if (process.env.VERCEL_BYPASS_TOKEN) {
+    headers['x-vercel-protection-bypass'] = process.env.VERCEL_BYPASS_TOKEN;
+  }
+
   try {
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload)
     });
     

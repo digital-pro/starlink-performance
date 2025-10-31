@@ -1,6 +1,6 @@
 ## Task Benchmarks (Cypress timings)
 
-This directory documents how to run end‑to‑end benchmarks for Levante core tasks from the `levante-performance` repo. Benchmarks execute Cypress specs in `core-tasks/task-launcher` and write timing results locally in this repo for analysis.
+This directory documents how to run end‑to‑end benchmarks for Levante core tasks from the `starlink-performance` repo. Benchmarks execute Cypress specs in `core-tasks/task-launcher` and write timing results locally in this repo for analysis.
 
 ### Layout
 
@@ -13,8 +13,8 @@ This directory documents how to run end‑to‑end benchmarks for Levante core t
 
 ### Prerequisites
 
-- `levante-performance` and `core-tasks` are siblings:
-  - `/home/djc/levante/levante-performance`
+- `starlink-performance` and `core-tasks` are siblings:
+  - `/home/djc/levante/starlink-performance`
   - `/home/djc/levante/core-tasks`
 - `core-tasks/task-launcher` dev server reachable at `http://localhost:8080` (we’ll start it separately or keep it running)
 - `core-tasks/task-launcher` has dependencies installed (`npm install` run previously)
@@ -27,7 +27,7 @@ This directory documents how to run end‑to‑end benchmarks for Levante core t
 
 ### NPM scripts
 
-From `levante-performance/task-benchmarks`:
+From `starlink-performance/task-benchmarks`:
 
 ```bash
 # Run all specs
@@ -46,7 +46,7 @@ Notes:
   ```bash
   PROVIDER=Starlink PROJECT_ROOT=/home/djc/levante/core-tasks/task-launcher npm run timings:all
   ```
-- You do not need to install Cypress in `levante-performance`. The runner loads Cypress from `PROJECT_ROOT`.
+- You do not need to install Cypress in `starlink-performance`. The runner loads Cypress from `PROJECT_ROOT`.
 - Video is OFF by default to reduce I/O and avoid large files. Enable per run with either:
   - Environment variable: `VIDEO=1 npm run timings:one:auto -- intro`
   - CLI flag: `node run_all_and_record.js --video intro`

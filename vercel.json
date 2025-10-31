@@ -3,7 +3,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "public",
   "alias": [
-    "levante-performance.vercel.app"
+    "starlink-performance.vercel.app"
   ],
   "functions": {
     "api/netdata-proxy.js": { "maxDuration": 10 },

@@ -1,4 +1,4 @@
-# Levante Performance
+# Starlink Performance
 
 A cloud-hosted performance dashboard for Starlink, built with Vue + TypeScript and deployed on Vercel. The UI reads metrics from Grafana Cloud Prometheus via a secure serverless proxy.
 
@@ -153,7 +153,7 @@ You can deploy from the command line (CI-friendly):
 
 ```bash
 # optional: set a permanent alias for the production deployment
-export VERCEL_ALIAS=levante-performance-digitalpros-projects.vercel.app
+export VERCEL_ALIAS=starlink-performance-digitalpros-projects.vercel.app
 
 # deploy (build → link → deploy → alias)
 npm run deploy
@@ -227,7 +227,7 @@ The dashboard uses the standard `danopstech/starlink_exporter` to collect metric
 ```bash
 cd /home/djc/starlink_exporter
 # The exporter_history.go file is already added
-go build -o /home/djc/levante/levante-performance/logs/starlink_exporter ./cmd/starlink_exporter
+go build -o /home/djc/levante/starlink-performance/logs/starlink_exporter ./cmd/starlink_exporter
 npm run restart:exporter  # Restart with new binary
 ```
 
@@ -368,10 +368,10 @@ STARLINK_TARGET=10.0.0.5:9817 npm run exporter:check
 ```
 
 - Verify dashboard read-path (Vercel → Grafana Cloud)
-  - Set `VERCEL_ALIAS` to your deployed hostname (e.g., `levante-performance.vercel.app` or your custom alias)
+  - Set `VERCEL_ALIAS` to your deployed hostname (e.g., `starlink-performance.vercel.app` or your custom alias)
 ```bash
-VERCEL_ALIAS=levante-performance.vercel.app npm run read:up | head -n1
-VERCEL_ALIAS=levante-performance.vercel.app npm run read:series | head -n1
+VERCEL_ALIAS=starlink-performance.vercel.app npm run read:up | head -n1
+VERCEL_ALIAS=starlink-performance.vercel.app npm run read:series | head -n1
 ```
 
 - Auto-discover exporter and wire automatically (optional)

@@ -1,6 +1,6 @@
 # Auto-Start Configuration
 
-The Levante Performance monitoring stack is now configured to **automatically start on boot** via systemd user service.
+The Starlink Performance monitoring stack is now configured to **automatically start on boot** via systemd user service.
 
 ## What Gets Started
 
@@ -12,52 +12,52 @@ The Levante Performance monitoring stack is now configured to **automatically st
 
 ### Check Status
 ```bash
-systemctl --user status levante-performance
+systemctl --user status starlink-performance
 ```
 
 ### Start Manually
 ```bash
-systemctl --user start levante-performance
+systemctl --user start starlink-performance
 ```
 
 ### Stop
 ```bash
-systemctl --user stop levante-performance
+systemctl --user stop starlink-performance
 ```
 
 ### Restart
 ```bash
-systemctl --user restart levante-performance
+systemctl --user restart starlink-performance
 ```
 
 ### View Logs
 ```bash
 # Service logs
-journalctl --user -u levante-performance -f
+journalctl --user -u starlink-performance -f
 
 # Prometheus logs
-tail -f ~/levante/levante-performance/logs/prometheus.out
+tail -f ~/levante/starlink-performance/logs/prometheus.out
 
 # Starlink exporter logs
-tail -f ~/levante/levante-performance/logs/starlink_exporter.out
+tail -f ~/levante/starlink-performance/logs/starlink_exporter.out
 
 # Watchdog logs
-tail -f ~/levante/levante-performance/logs/watchdog.out
+tail -f ~/levante/starlink-performance/logs/watchdog.out
 ```
 
 ### Disable Auto-Start (if needed)
 ```bash
-systemctl --user disable levante-performance
+systemctl --user disable starlink-performance
 ```
 
 ### Re-enable Auto-Start
 ```bash
-systemctl --user enable levante-performance
+systemctl --user enable starlink-performance
 ```
 
 ## Configuration
 
-Service file location: `~/.config/systemd/user/levante-performance.service`
+Service file location: `~/.config/systemd/user/starlink-performance.service`
 
 Environment variables (edit service file if needed):
 - `INSTANCE_ID=2743807` - Grafana Cloud instance ID
@@ -67,7 +67,7 @@ Environment variables (edit service file if needed):
 After editing the service file:
 ```bash
 systemctl --user daemon-reload
-systemctl --user restart levante-performance
+systemctl --user restart starlink-performance
 ```
 
 ## Testing Auto-Start
@@ -75,13 +75,13 @@ systemctl --user restart levante-performance
 To test without rebooting:
 ```bash
 # Stop everything
-systemctl --user stop levante-performance
+systemctl --user stop starlink-performance
 
 # Start via systemd (simulates boot)
-systemctl --user start levante-performance
+systemctl --user start starlink-performance
 
 # Check status
-systemctl --user status levante-performance
+systemctl --user status starlink-performance
 ps aux | grep -E "(starlink|prometheus)" | grep -v grep
 ```
 
@@ -89,7 +89,7 @@ ps aux | grep -E "(starlink|prometheus)" | grep -v grep
 
 1. System boots
 2. User lingering is enabled, so systemd user services start automatically
-3. `levante-performance.service` starts
+3. `starlink-performance.service` starts
 4. Starlink exporter starts
 5. Prometheus starts (scrapes every 30s, pushes to Grafana Cloud)
 6. Watchdog starts (monitors and auto-restarts if needed)

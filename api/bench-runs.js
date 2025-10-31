@@ -14,7 +14,7 @@ function getStorage() {
 
 async function readFromGCS() {
   try {
-    const bucketName = process.env.GCP_BUCKET_NAME || 'levante-performance-dev';
+    const bucketName = process.env.GCP_BUCKET_NAME || 'starlink-performance-dev';
     const storage = getStorage();
     const bucket = storage.bucket(bucketName);
     // Prefer a canonical runs.json
@@ -49,7 +49,7 @@ async function readFromGCS() {
 
 async function readMergedRecentFromGCS(maxFiles = 100) {
   try {
-    const bucketName = process.env.GCP_BUCKET_NAME || 'levante-performance-dev';
+    const bucketName = process.env.GCP_BUCKET_NAME || 'starlink-performance-dev';
     const storage = getStorage();
     const bucket = storage.bucket(bucketName);
     const [files] = await bucket.getFiles({ prefix: 'benchmarks/' });

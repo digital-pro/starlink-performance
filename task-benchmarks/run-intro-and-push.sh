@@ -13,5 +13,5 @@ echo "📤 Pushing results to dashboard..."
 npm run push
 
 echo ""
-echo "✅ Done! View results at: https://levante-performance.vercel.app"
+echo "✅ Done! View results at: https://starlink-performance.vercel.app"
 

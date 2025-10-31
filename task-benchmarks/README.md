@@ -7,19 +7,19 @@ Run Levante task benchmarks and visualize them on the performance dashboard with
 ### Run intro and push to dashboard:
 
 ```bash
-cd /home/david/levante/levante-performance/task-benchmarks
+cd /home/david/levante/starlink-performance/task-benchmarks
 ./run-intro-and-push.sh
 ```
 
 This will:
 1. Run the intro Cypress test
 2. Record timing data to `runs.ndjson`
-3. Push results to https://levante-performance.vercel.app
+3. Push results to https://starlink-performance.vercel.app
 4. Vertical lines will appear on the dashboard charts marking when the test started/ended
 
 ## 📊 View Results
 
-Open https://levante-performance.vercel.app
+Open https://starlink-performance.vercel.app
 
 You'll see:
 - **Green vertical lines** = benchmark task start time
@@ -93,7 +93,7 @@ This reads from `runs.ndjson` and uploads to the dashboard.
 
 2. **In another terminal, run benchmarks:**
    ```bash
-   cd /home/david/levante/levante-performance/task-benchmarks
+   cd /home/david/levante/starlink-performance/task-benchmarks
    
    # Run intro during good conditions
    PROVIDER=Starlink ./run-intro-and-push.sh
@@ -104,7 +104,7 @@ This reads from `runs.ndjson` and uploads to the dashboard.
    ```
 
 3. **View dashboard:**
-   - Go to https://levante-performance.vercel.app
+   - Go to https://starlink-performance.vercel.app
    - See vertical lines showing when each test ran
    - Compare latency/bandwidth during each test period
 
@@ -144,7 +144,7 @@ try {
 
 ### "Error pushing to dashboard"
 - Check that GCP environment variables are set in Vercel
-- Verify bucket permissions: `gsutil iam get gs://levante-performance-dev`
+- Verify bucket permissions: `gsutil iam get gs://starlink-performance-dev`
 
 ### "No runs found in runs.ndjson"
 - Run a benchmark first: `npm run timings:one intro`

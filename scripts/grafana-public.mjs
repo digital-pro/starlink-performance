@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 async function readToken() {
   if (process.env.GRAFANA_API_TOKEN && process.env.GRAFANA_API_TOKEN.trim()) return process.env.GRAFANA_API_TOKEN.trim();
-  const t = await readFile('/home/djc/levante/levante-performance/secrets/grafana_api_token.txt', 'utf8');
+  const t = await readFile('/home/djc/levante/starlink-performance/secrets/grafana_api_token.txt', 'utf8');
   const token = t.trim();
   if (!token) throw new Error('grafana_api_token.txt is empty');
   return token;

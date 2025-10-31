@@ -1,6 +1,6 @@
 // vite.config.ts
-import { defineConfig } from "file:///home/djc/levante/levante-performance/node_modules/vite/dist/node/index.js";
-import vue from "file:///home/djc/levante/levante-performance/node_modules/@vitejs/plugin-vue/dist/index.mjs";
+import { defineConfig } from "file:///home/djc/levante/starlink-performance/node_modules/vite/dist/node/index.js";
+import vue from "file:///home/djc/levante/starlink-performance/node_modules/@vitejs/plugin-vue/dist/index.mjs";
 var vite_config_default = defineConfig({
   plugins: [vue()],
   server: {
