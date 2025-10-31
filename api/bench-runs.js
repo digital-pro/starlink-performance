@@ -1,5 +1,9 @@
 import { get, list } from '@vercel/blob';
 
+if (!process.env.BLOB_READ_WRITE_TOKEN && process.env.PERFORMANCE_READ_WRITE_TOKEN) {
+  process.env.BLOB_READ_WRITE_TOKEN = process.env.PERFORMANCE_READ_WRITE_TOKEN;
+}
+
 async function readBlobJson(pathname) {
   try {
     const result = await get(pathname, { download: true });
@@ -12,7 +16,8 @@ async function readBlobJson(pathname) {
 
 async function readFromBlob() {
   try {
-    for (const key of ['benchmarks/runs.json', 'benchmarks/latest.json']) {
+    const preferExact = ['benchmarks/runs.json', 'benchmarks/latest.json'];
+    for (const key of preferExact) {
       const data = await readBlobJson(key);
       if (Array.isArray(data?.runs)) return data.runs;
       if (Array.isArray(data)) return data;
@@ -22,8 +27,22 @@ async function readFromBlob() {
     const blobs = collected?.blobs ?? [];
     if (blobs.length === 0) return [];
 
+    const runsCandidate = blobs.find(b => b.pathname.startsWith('benchmarks/runs'));
+    if (runsCandidate) {
+      const data = await readBlobJson(runsCandidate.pathname);
+      if (Array.isArray(data?.runs)) return data.runs;
+      if (Array.isArray(data)) return data;
+    }
+
+    const latestCandidate = blobs.find(b => b.pathname.startsWith('benchmarks/latest'));
+    if (latestCandidate) {
+      const data = await readBlobJson(latestCandidate.pathname);
+      if (Array.isArray(data?.runs)) return data.runs;
+      if (Array.isArray(data)) return data;
+    }
+
     const timestamped = blobs
-      .filter(b => /benchmarks\/.+\.json$/.test(b.pathname) && !b.pathname.endsWith('runs.json') && !b.pathname.endsWith('latest.json'))
+      .filter(b => /benchmarks\/.+\.json$/.test(b.pathname) && !b.pathname.startsWith('benchmarks/runs') && !b.pathname.startsWith('benchmarks/latest'))
       .sort((a, b) => {
         const aTime = parseInt(a.pathname.split('/')[1]?.split('.')[0] || '0', 10);
         const bTime = parseInt(b.pathname.split('/')[1]?.split('.')[0] || '0', 10);
@@ -46,7 +65,7 @@ async function readMergedRecentFromBlob(maxFiles = 100) {
     const blobs = collected?.blobs ?? [];
     const candidates = blobs
       .map(b => b.pathname)
-      .filter(n => n.endsWith('.json') && !n.endsWith('runs.json') && !n.endsWith('latest.json'));
+      .filter(n => n.endsWith('.json') && !n.startsWith('benchmarks/runs') && !n.startsWith('benchmarks/latest'));
     if (candidates.length === 0) return [];
     const sorted = candidates.sort((a, b) => {
       const aTime = parseInt(a.split('/')[1]?.split('.')[0] || '0', 10);
@@ -84,12 +103,18 @@ export default async function handler(req, res) {
     if (!arr || arr.length === 0) arr = await readFromBlob();
     if (!arr || arr.length === 0) arr = await readMergedRecentFromBlob(150);
 
-    const items = (Array.isArray(arr) ? arr : []).map(r => ({
-      task: r.task || 'unknown',
-      start: typeof r.start === 'number' ? r.start : (Date.parse(r.timestamp || '') || null),
-      end: typeof r.end === 'number' ? r.end : (Date.parse(r.finishedAt || '') || null),
-      metadata: r.metadata || {}
-    })).filter(x => x.start && x.end);
+    const items = (Array.isArray(arr) ? arr : []).map((r) => {
+      const start = typeof r.start === 'number' ? r.start : (Date.parse(r.timestamp || '') || null);
+      const end = typeof r.end === 'number' ? r.end : (Date.parse(r.finishedAt || '') || null);
+      const metadata = r.metadata && typeof r.metadata === 'object' ? r.metadata : {};
+      return {
+        ...r,
+        task: typeof r.task === 'string' && r.task.trim() ? r.task.trim() : 'unknown',
+        start,
+        end,
+        metadata,
+      };
+    }).filter(x => Number.isFinite(x.start) && Number.isFinite(x.end));
 
     res.status(200).json({ ok: true, runs: items });
   } catch (e) {

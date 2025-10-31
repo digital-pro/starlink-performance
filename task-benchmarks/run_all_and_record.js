@@ -2,9 +2,8 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
-import { exec as execCb } from 'child_process';
+import { exec as execCb, spawn } from 'child_process';
 import { promisify } from 'util';
-import { spawn } from 'child_process';
 const exec = promisify(execCb);
 
 const __filename = fileURLToPath(import.meta.url);
@@ -166,11 +165,21 @@ function deriveProvider() {
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+function resolveCheckUrl(baseUrl) {
+  try {
+    const url = new URL(baseUrl);
+    return `${url.origin}/`;
+  } catch {
+    return baseUrl;
+  }
+}
+
 async function isServerUp(baseUrl) {
+  const target = resolveCheckUrl(baseUrl);
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 1000);
-    const res = await fetch(baseUrl, { signal: controller.signal });
+    const res = await fetch(target, { signal: controller.signal });
     clearTimeout(timeout);
     return res.ok || (res.status >= 200 && res.status < 500);
   } catch {
@@ -179,8 +188,9 @@ async function isServerUp(baseUrl) {
 }
 
 async function waitForServer(baseUrl, retries, delayMs, onEarlyExit) {
+  const target = resolveCheckUrl(baseUrl);
   for (let attempt = 0; attempt < retries; attempt++) {
-    if (await isServerUp(baseUrl)) return true;
+    if (await isServerUp(target)) return true;
     if (onEarlyExit?.()) return false;
     await sleep(delayMs);
   }
@@ -188,28 +198,33 @@ async function waitForServer(baseUrl, retries, delayMs, onEarlyExit) {
 }
 
 async function ensureDevServer(projectRoot, baseUrl) {
+  const checkUrl = resolveCheckUrl(baseUrl);
   const skip = String(process.env.SKIP_AUTOSTART_DEV_SERVER || '').toLowerCase() === '1';
   if (skip) {
-    return { started: false, async stop() {} };
+    return { started: false, url: checkUrl };
   }
 
-  if (await isServerUp(baseUrl)) {
-    return { started: false, async stop() {} };
+  if (await isServerUp(checkUrl)) {
+    console.log(`[bench] Detected dev server already running at ${checkUrl}`);
+    return { started: false, url: checkUrl };
   }
 
   const url = new URL(baseUrl);
   const port = url.port || '8080';
-  console.log(`[bench] Starting task launcher dev server on port ${port} for ${baseUrl}...`);
+  console.log(`[bench] Starting task launcher dev server on port ${port} for ${checkUrl}...`);
 
   const child = spawn(
     'npx',
     ['webpack', 'serve', '--mode', 'development', '--port', port],
     {
       cwd: projectRoot,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: process.platform === 'win32'
+      stdio: 'ignore',
+      shell: process.platform === 'win32',
+      detached: true
     }
   );
+
+  child.unref();
 
   let exited = false;
   let exitCode = null;
@@ -217,25 +232,18 @@ async function ensureDevServer(projectRoot, baseUrl) {
     exited = true;
     exitCode = code;
   });
-  child.stdout?.on('data', data => process.stdout.write(`[launcher] ${data}`));
-  child.stderr?.on('data', data => process.stderr.write(`[launcher] ${data}`));
 
-  const ready = await waitForServer(baseUrl, 60, 1000, () => exited);
+  const ready = await waitForServer(checkUrl, 60, 1000, () => exited);
   if (!ready) {
-    child.kill(process.platform === 'win32' ? 'SIGINT' : 'SIGTERM');
+    try {
+      child.kill();
+    } catch {}
     const reason = exited ? ` (exited with code ${exitCode})` : '';
     throw new Error(`Task launcher dev server failed to start${reason}`);
   }
 
-  return {
-    started: true,
-    async stop() {
-      console.log('[bench] Shutting down auto-started dev server...');
-      if (child.killed || exited) return;
-      child.kill(process.platform === 'win32' ? 'SIGINT' : 'SIGTERM');
-      await new Promise(resolve => child.once('exit', resolve));
-    }
-  };
+  console.log(`[bench] Dev server is ready at ${checkUrl} (pid ${child.pid}); leaving it running.`);
+  return { started: true, url: checkUrl, pid: child.pid };
 }
 
 async function appendRunRecord(record) {
@@ -377,10 +385,12 @@ async function main() {
   const projectRoot = await resolveProjectRoot();
   const baseUrl = process.env.CYPRESS_BASE_URL || 'http://localhost:8080';
   const devServer = await ensureDevServer(projectRoot, baseUrl);
+  if (devServer.started) {
+    console.log('[bench] Tip: dev server auto-started; export SKIP_AUTOSTART_DEV_SERVER=1 to skip in future runs.');
+  }
 
-  try {
-    const specsDir = path.join(projectRoot, 'cypress', 'e2e');
-    const allSpecs = await collectSpecs(specsDir);
+  const specsDir = path.join(projectRoot, 'cypress', 'e2e');
+  const allSpecs = await collectSpecs(specsDir);
   console.log(`[bench] Discovered ${allSpecs.length} spec files under ${specsDir}`);
   const cypressLib = await loadCypressFromProject(projectRoot);
 
@@ -422,10 +432,8 @@ async function main() {
   if (hb) clearInterval(hb);
   await pushAllRunsNow();
   console.log('\nAll done. Results appended to cypress/timing/runs.json');
-  } finally {
-    if (devServer.started) {
-      await devServer.stop();
-    }
+  if (devServer.started) {
+    console.log(`[bench] Dev server at ${devServer.url} remains running for subsequent benchmark runs.`);
   }
 }
 

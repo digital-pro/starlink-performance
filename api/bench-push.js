@@ -1,5 +1,9 @@
 import { put } from '@vercel/blob';
 
+if (!process.env.BLOB_READ_WRITE_TOKEN && process.env.PERFORMANCE_READ_WRITE_TOKEN) {
+  process.env.BLOB_READ_WRITE_TOKEN = process.env.PERFORMANCE_READ_WRITE_TOKEN;
+}
+
 export default async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
@@ -14,43 +18,66 @@ export default async function handler(req, res) {
       return;
     }
 
-    const safe = body.map(r => ({
-      task: String(r.task || 'unknown'),
-      start: Number(r.start || Date.parse(r.timestamp || 0)) || Date.now(),
-      end: Number(r.end || Date.parse(r.finishedAt || 0)) || Date.now(),
-      metadata: r.metadata || {}
-    })).filter(x => Number.isFinite(x.start) && Number.isFinite(x.end));
+    const runs = body
+      .filter(r => r && typeof r === 'object')
+      .map((raw) => {
+        const task = typeof raw.task === 'string' && raw.task.trim() ? raw.task.trim() : 'unknown';
+        const timestamp = raw.timestamp || new Date().toISOString();
+        const finishedAt = raw.finishedAt || raw.completedAt || timestamp;
+        const start = Number.isFinite(raw.start) ? raw.start : Date.parse(timestamp) || Date.now();
+        const end = Number.isFinite(raw.end) ? raw.end : Date.parse(finishedAt) || start;
+        const metadata = raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : {};
+
+        return {
+          ...raw,
+          task,
+          timestamp,
+          finishedAt,
+          start,
+          end,
+          metadata,
+        };
+      })
+      .filter((r) => Number.isFinite(r.start) && Number.isFinite(r.end));
+
+    if (runs.length === 0) {
+      res.status(400).json({ error: 'No valid benchmark runs in payload' });
+      return;
+    }
 
     const timestamp = Date.now();
     const payloadObject = {
       timestamp: new Date().toISOString(),
-      runs: safe
+      runs
     };
     const payload = JSON.stringify(payloadObject, null, 2);
 
     const objectKey = `benchmarks/${timestamp}.json`;
 
     await put(objectKey, payload, {
-      access: 'private',
+      access: 'public',
       contentType: 'application/json',
-      cacheControl: 'no-store'
+      cacheControl: 'no-store',
+      addRandomSuffix: false
     });
 
     await put('benchmarks/latest.json', payload, {
-      access: 'private',
+      access: 'public',
       contentType: 'application/json',
-      cacheControl: 'no-store'
+      cacheControl: 'no-store',
+      addRandomSuffix: false
     });
 
-    await put('benchmarks/runs.json', JSON.stringify(safe, null, 2), {
-      access: 'private',
+    await put('benchmarks/runs.json', JSON.stringify(runs, null, 2), {
+      access: 'public',
       contentType: 'application/json',
-      cacheControl: 'no-store'
+      cacheControl: 'no-store',
+      addRandomSuffix: false
     });
 
-    globalThis.__BENCH_RUNS_CACHE__ = safe;
+    globalThis.__BENCH_RUNS_CACHE__ = runs;
 
-    res.status(200).json({ ok: true, count: safe.length, stored: objectKey });
+    res.status(200).json({ ok: true, count: runs.length, stored: objectKey });
   } catch (e) {
     res.status(500).json({ error: 'server_error', detail: String(e?.message || e) });
   }

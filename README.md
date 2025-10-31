@@ -329,7 +329,7 @@ deployment/               # Remote write helpers for Prometheus → Grafana Clou
 
 ## License
 
-MIT (c) Levante Framework
+Licensed under the Non-Commercial License © 2025 David Cardinal. See `LICENSE` for full terms or contact digital-pro for commercial use.
 
 ---
 
