@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Benchmark Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+<body>
+    <h1>Benchmark Vertical Lines Test</h1>
+    <div id="chart" style="width: 100%; height: 400px;"></div>
+    
+    <script>
+        // Fetch benchmark runs and display them
+        fetch('https://starlink-performance.vercel.app/api/bench-runs')
+            .then(r => r.json())
+            .then(data => {
+                console.log('Benchmark data:', data);
+                
+                const benchRuns = data.runs || [];
+                console.log(`Found ${benchRuns.length} benchmark runs`);
+                
+                // Create sample data for the last hour
+                const now = Date.now();
+                const hourAgo = now - 3600000;
+                const sampleData = [];
+                for (let i = 0; i < 100; i++) {
+                    const time = hourAgo + (i * 36000);
+                    sampleData.push([time, Math.random() * 100 + 50]);
+                }
+                
+                // Create markLine data
+                const markLineData = benchRuns.flatMap(run => [
+                    { name: `${run.task} ▶`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 } },
+                    { name: `${run.task} ◼`, xAxis: run.end, lineStyle: { color: '#b30000', width: 2 } }
+                ]);
+                
+                console.log('MarkLine data:', markLineData);
+                
+                const chart = echarts.init(document.getElementById('chart'));
+                chart.setOption({
+                    title: { text: 'Test Chart with Benchmark Markers' },
+                    tooltip: { trigger: 'axis' },
+                    xAxis: { type: 'time' },
+                    yAxis: { type: 'value' },
+                    series: [{
+                        type: 'line',
+                        name: 'Sample Data',
+                        data: sampleData,
+                        markLine: {
+                            symbol: ['none', 'none'],
+                            label: { show: true, formatter: p => p.name || '' },
+                            data: markLineData
+                        }
+                    }]
+                });
+            })
+            .catch(e => {
+                console.error('Error:', e);
+                document.body.innerHTML += `<p style="color:red">Error: ${e.message}</p>`;
+            });
+    </script>
+</body>
+</html>
+

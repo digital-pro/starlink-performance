@@ -78,7 +78,7 @@ fi
 # Generate config
 cat > "$CONF" <<YAML
 global:
-  scrape_interval: 15s
+  scrape_interval: 10s
 
 rule_files:
   - ${ROOT_DIR}/deployment/rules/*.yml
@@ -99,6 +99,14 @@ scrape_configs:
       timestamps: [yes]
       names: [yes]
     static_configs: [{ targets: ['${NETDATA}'] }]
+    metric_relabel_configs:
+      # Keep only net_speed and anomaly detection metrics (drops from ~649KB to ~5KB per scrape)
+      - source_labels: [__name__]
+        regex: 'netdata_(net_speed_.*|anomaly_detection_.*)'
+        action: keep
+
+  - job_name: wifi
+    static_configs: [{ targets: ['127.0.0.1:9818'] }]
 
 remote_write:
   - url: https://prometheus-prod-36-prod-us-west-0.grafana.net/api/prom/push

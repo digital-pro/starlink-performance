@@ -16,7 +16,7 @@ async function run(cmd) {
 
 async function getStarlinkTarget() {
   try {
-    const text = await readFile('/home/djc/levante/levante-performance/secrets/starlink_target.txt', 'utf8');
+    const text = await readFile('/home/djc/levante/starlink-performance/secrets/starlink_target.txt', 'utf8');
     const t = text.trim();
     if (t) return t;
   } catch {}
@@ -68,16 +68,17 @@ async function exporterFreshnessOk() {
 
 async function startExporter() {
   // Try existing binary first; build if missing
-  const bin = '/home/djc/levante/levante-performance/logs/starlink_exporter';
-  await run('mkdir -p /home/djc/levante/levante-performance/logs');
+  const bin = '/home/djc/levante/starlink-performance/logs/starlink_exporter';
+  await run('mkdir -p /home/djc/levante/starlink-performance/logs');
   try {
     await run(`test -x ${bin} || (cd /home/djc/starlink_exporter && go build -o ${bin} ./cmd/starlink_exporter)`);
   } catch {}
-  await run(`nohup ${bin} -port 9817 > /home/djc/levante/levante-performance/logs/starlink_exporter.out 2>&1 & echo $! > /home/djc/levante/levante-performance/logs/starlink_exporter.pid`);
+  const dishAddr = process.env.STARLINK_DISH_ADDR || '192.168.100.1:9201';
+  await run(`nohup ${bin} -address ${dishAddr} -port 9817 > /home/djc/levante/starlink-performance/logs/starlink_exporter.out 2>&1 & echo $! > /home/djc/levante/starlink-performance/logs/starlink_exporter.pid`);
 }
 
 async function restartProm() {
-  await run('node /home/djc/levante/levante-performance/scripts/ops-restart.mjs');
+  await run('node /home/djc/levante/starlink-performance/scripts/ops-restart.mjs');
 }
 
 (async () => {

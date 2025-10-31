@@ -1,5 +1,5 @@
 {
-  "name": "levante-performance",
+  "name": "starlink-performance",
   "private": true,
   "workspaces": [
     "apps/*"
@@ -10,9 +10,15 @@
     "preview": "npx http-server public -p 5175 -c-1",
     "dev:vue": "npm run dev -w @levante/vue-dashboard",
     "deploy": "node scripts/deploy.mjs",
-    "prom:start": "bash /home/djc/levante/levante-performance/deployment/run-wsl-prom.sh --instance ${INSTANCE_ID} --starlink ${STARLINK_TARGET:-127.0.0.1:9817} --bg",
-    "prom:stop": "pkill -f '/home/djc/levante/levante-performance/logs/prometheus/prometheus' || true",
-    "prom:logs": "tail -n 200 /home/djc/levante/levante-performance/logs/prometheus.out || true",
+    "timings:all": "npm --prefix task-benchmarks run timings:all",
+    "timings:one": "npm --prefix task-benchmarks run timings:one",
+    "timings:backfill": "npm --prefix task-benchmarks run timings:backfill",
+    "timings:all:auto": "npm --prefix task-benchmarks run timings:all:auto",
+    "timings:one:auto": "npm --prefix task-benchmarks run timings:one:auto",
+    "timings:push": "npm --prefix task-benchmarks run push",
+    "prom:start": "bash /home/djc/levante/starlink-performance/deployment/run-wsl-prom.sh --instance ${INSTANCE_ID} --starlink ${STARLINK_TARGET:-127.0.0.1:9817} --bg",
+    "prom:stop": "pkill -f '/home/djc/levante/starlink-performance/logs/prometheus/prometheus' || true",
+    "prom:logs": "tail -n 200 /home/djc/levante/starlink-performance/logs/prometheus.out || true",
     "prom:targets": "curl -fsS http://127.0.0.1:9090/api/v1/targets || true",
     "exporter:check": "curl -fsS http://${STARLINK_TARGET:-127.0.0.1:9817}/metrics | head || true",
     "read:up": "test -n \"$VERCEL_ALIAS\" && curl -sS https://$VERCEL_ALIAS/api/promql?query=up || echo 'Set VERCEL_ALIAS to your deployed domain'",
@@ -21,8 +27,9 @@
     "ops:set-target": "bash scripts/ops-set-target.sh",
     "ops:find-target": "bash scripts/find-starlink-exporter.sh || echo 'Not found'",
     "ops:auto-wire": "TARGET=$(bash scripts/find-starlink-exporter.sh 2>/dev/null || true); if [ -n \"$TARGET\" ]; then echo Found $TARGET; bash scripts/ops-set-target.sh $TARGET; node scripts/ops-restart.mjs; else echo 'Exporter not found on common subnets'; fi",
-    "restart:exporter": "test -f logs/starlink_exporter.pid && kill $(cat logs/starlink_exporter.pid) || true; cd /home/djc/starlink_exporter && go build -o /home/djc/levante/levante-performance/logs/starlink_exporter ./cmd/starlink_exporter && nohup /home/djc/levante/levante-performance/logs/starlink_exporter -address ${STARLINK_DISH_ADDR:-192.168.100.1:9201} -port 9817 > /home/djc/levante/levante-performance/logs/starlink_exporter.out 2>&1 & echo $! > /home/djc/levante/levante-performance/logs/starlink_exporter.pid && echo started",
-    "restart:stack": "npm run restart:exporter && npm run ops:restart",
+    "restart:exporter": "test -f logs/starlink_exporter.pid && kill $(cat logs/starlink_exporter.pid) || true; cd /home/djc/starlink_exporter && go build -o /home/djc/levante/starlink-performance/logs/starlink_exporter ./cmd/starlink_exporter && nohup /home/djc/levante/starlink-performance/logs/starlink_exporter -address ${STARLINK_DISH_ADDR:-192.168.100.1:9200} -port 9817 > /home/djc/levante/starlink-performance/logs/starlink_exporter.out 2>&1 & echo $! > /home/djc/levante/starlink-performance/logs/starlink_exporter.pid && echo started",
+    "restart:wifi": "test -f logs/wifi-exporter.pid && kill $(cat logs/wifi-exporter.pid) || true; mkdir -p logs && nohup node scripts/wifi-exporter.mjs > logs/wifi-exporter.out 2>&1 & echo $! > logs/wifi-exporter.pid && echo started",
+    "restart:stack": "npm run restart:exporter && npm run restart:wifi && npm run ops:restart",
     "watchdog:start": "mkdir -p logs && nohup node scripts/watchdog.mjs > logs/watchdog.out 2>&1 & echo $! > logs/watchdog.pid && echo started",
     "watchdog:stop": "test -f logs/watchdog.pid && kill $(cat logs/watchdog.pid) || true",
     "exporter:mock:start": "node scripts/exporter-mock.js",
@@ -31,10 +38,15 @@
     "dev:stack": "npm run exporter:mock:start:bg && npm run ops:set-target -- 127.0.0.1:9817 && npm run ops:restart && npm run prom:targets",
     "diagnose:starlink": "node scripts/diagnose-starlink.mjs",
     "grafana:import": "node scripts/import-grafana-dashboard.mjs",
-    "grafana:public": "node scripts/grafana-public.mjs"
+    "grafana:public": "node scripts/grafana-public.mjs",
+    "start:api": "PROM_URL=http://localhost:9090/api/v1 node scripts/api-server.mjs",
+    "start:api:bg": "PROM_URL=http://localhost:9090/api/v1 nohup node scripts/api-server.mjs > logs/api-server.out 2>&1 & echo $! > logs/api-server.pid && echo started"
   },
   "devDependencies": {
     "http-server": "^14.1.1",
     "vercel": "^48.4.0"
+  },
+  "dependencies": {
+    "@vercel/blob": "^0.8.0"
   }
 }

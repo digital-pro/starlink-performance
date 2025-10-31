@@ -1,7 +1,9 @@
 {
   "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
   "alias": [
-    "levante-performance.vercel.app"
+    "starlink-performance.vercel.app"
   ],
   "functions": {
     "api/netdata-proxy.js": { "maxDuration": 10 },
@@ -9,10 +11,8 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/favicon.ico", "destination": "/public/favicon.ico" },
-    { "source": "/bucket-manifest.json", "destination": "/public/bucket-manifest.json" },
-    { "source": "/", "destination": "/public/vue/index.html" },
-    { "source": "/(.*)", "destination": "/public/vue/$1" }
+    { "source": "/", "destination": "/vue/index.html" },
+    { "source": "/(.*)", "destination": "/vue/$1" }
   ],
   "headers": [
     { "source": "/", "headers": [

@@ -3,13 +3,14 @@ import { join } from 'node:path';
 
 const root = process.cwd();
 const publicDir = join(root, 'public');
+const publicVueDir = join(publicDir, 'vue');
 const vueDist = join(root, 'apps', 'vue-dashboard', 'dist');
 
 if (existsSync(publicDir)) rmSync(publicDir, { recursive: true, force: true });
-mkdirSync(publicDir, { recursive: true });
+mkdirSync(publicVueDir, { recursive: true });
 
 if (existsSync(vueDist)) {
-  cpSync(vueDist, publicDir, { recursive: true });
+  cpSync(vueDist, publicVueDir, { recursive: true });
 }
 
 // Minimal favicon placeholder

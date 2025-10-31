@@ -15,7 +15,7 @@ Use this to push your existing Prometheus metrics (local + starlink nodes) to Gr
 1) Save your write token in `secrets/grafana_write_token.txt` (do not commit).
 2) Generate a snippet for this node:
 ```bash
-cd /home/djc/levante/levante-performance/deployment
+cd /home/djc/levante/starlink-performance/deployment
 INSTANCE_ID=2743807 SITE=local ./generate-remote-write.sh > remote-write.local.yml
 # on the starlink node: SITE=starlink ./generate-remote-write.sh > remote-write.starlink.yml
 ```

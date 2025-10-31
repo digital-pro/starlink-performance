@@ -1,0 +1,18 @@
+## Code Editing Rules
+
+1. **Only edit code directly related to the user's request**
+   - Do NOT modify, reformat, or "improve" code that is not part of the requested change
+   - Do NOT revert previous changes unless explicitly asked
+   - If you need to edit unrelated code to fix a dependency, ASK THE USER FIRST
+
+2. **When using edit_file or search_replace:**
+   - Be surgical: only change the specific lines needed
+   - Verify you're not accidentally reverting previous work
+   - If the edit tool makes unexpected changes, use read_file to verify before deploying
+
+3. **Preserve existing functionality:**
+   - Don't remove working code unless explicitly requested
+   - Don't change indentation, formatting, or structure of unrelated code
+   - Don't "clean up" or "refactor" unless that's the specific request
+alwaysApply: true
+---

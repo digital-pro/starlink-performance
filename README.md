@@ -26,6 +26,77 @@ A cloud-hosted performance dashboard for Starlink, built with Vue + TypeScript a
 
 ---
 
+## Dashboard Features
+
+### Charts & Metrics
+- **Bandwidth Chart** (240px height): Displays download/upload speeds (Mbps), MB/min, MB/10min, and micro-loss (%)
+  - Crosshair tooltip shows all metric values at cursor position
+  - Perfectly aligned timeline with other charts
+- **Latency Chart** (180px height): Shows latency (ms) and packet loss (%) over time with benchmark run overlays
+  - 50% taller than original for better visibility
+- **Anomaly Detection & Starlink Events Chart** (120px height): Displays Netdata anomaly rate with event overlays
+  - Smart event detection with baseline-relative analysis
+  - Independent legend toggles for anomaly rate and events
+  - Hover tooltips show event details and timestamps
+- **Time Range Selector**: Choose 10 min, 1 hour, 3 hours, 6 hours, or 12 hours (persists in localStorage)
+- **Legend Persistence**: Chart legend selections (show/hide metrics) are saved across page refreshes
+- **X-Axis Format**: Time only (HH:MM) in 24-hour Pacific Time format
+- **Timeline Alignment**: All three charts use identical grid spacing for vertical alignment
+- **Data Resolution**: 30-second step size balances detail and performance (~1440 samples for 12-hour view)
+
+### Correlation Indicators (Last 15m)
+- **Latency↔Drops**: Correlation coefficient between latency and packet drops (-1 to +1). Hover for details.
+- **Latency↔CPU**: Correlation between latency and CPU usage. Positive values suggest CPU load impacts performance.
+- **15s Periodicity**: Autocorrelation analysis detects repeating ~15-second patterns in latency. Yellow (YES) indicates periodic spikes from scheduled processes, satellite beam switching, or regular interference. Gray (no) means random variations.
+
+### Diagnostic Flags
+Four real-time indicators for common Starlink issues:
+- **Latency spike**: Short-term spike vs baseline
+- **Micro-loss**: Sustained 1-2% packet loss (typical on Starlink)
+- **Outage active**: Outage duration increasing
+- **Obstruction**: Obstruction indicator > 0.2 over 5m
+
+### Benchmark Overlays
+- **Vertical markers** on charts show start (green ▶) and end (red ◼) times of Cypress benchmark runs
+- **Labels** display task name and data transferred (e.g., "↓429MB ↑31MB")
+- **Enhanced tooltips**: Hover over markers to see:
+  - Task name
+  - Data transferred (download/upload in MB)
+  - Time range (start - end in HH:MM Pacific Time)
+- **Auto-refresh**: Benchmark data refreshes every 60 seconds
+- **Timestamps**: All times displayed in Pacific Time (24-hour format)
+- **Accurate calculations**: Uses 10-second step size matching Prometheus scrape interval for precise byte counting
+
+### Packet Loss Details Modal
+Click "Packet loss details" button to see:
+- Current loss percentage
+- Max/Avg over 5m, 15m, and 1h windows
+- Time with loss > 0% (15m)
+
+### Smart Starlink Event Detection
+The dashboard automatically detects and displays Starlink events by analyzing metric patterns with **baseline-relative detection**:
+
+**Detection Algorithm:**
+- Maintains a rolling 5-minute baseline of obstruction levels
+- Checks every 10 minutes for significant changes
+- Detects spikes (1.5x baseline), increases (+1.5% absolute), and high packet loss (>3%)
+- Also detects state changes (sky search, recovery) from throughput patterns
+
+**Event Types:**
+- **🔴 Obstruction spike** - Obstruction 1.5x above recent baseline (e.g., "5.2% (baseline 3.8%)")
+- **🟠 Obstruction increased** - Absolute increase of +1.5% or more
+- **⚠️ High packet loss** - Packet loss exceeds 3%
+- **🔍 Sky Search** - Both throughputs drop to near-zero (< 80 Kbps)
+- **✅ Recovery** - Return to normal operation after degradation
+
+**Display:**
+- Events shown as color-coded vertical lines on the Anomaly Detection chart
+- Hover over event markers (emoji icons) to see full message and timestamp
+- Independent legend toggle for "Starlink Events" (separate from anomaly rate line)
+- Provides similar visibility to the Starlink mobile app using only local metrics
+
+---
+
 ## Prerequisites
 
 - Node.js 18+
@@ -82,7 +153,7 @@ You can deploy from the command line (CI-friendly):
 
 ```bash
 # optional: set a permanent alias for the production deployment
-export VERCEL_ALIAS=levante-performance-digitalpros-projects.vercel.app
+export VERCEL_ALIAS=starlink-performance-digitalpros-projects.vercel.app
 
 # deploy (build → link → deploy → alias)
 npm run deploy
@@ -125,6 +196,51 @@ If your metrics originate from local Prometheus instances, use `deployment/` hel
   - `deployment/generate-remote-write.sh`: fills in your stack and token.
   - `deployment/apply-remote-write.sh`: safe merge + optional restart.
   - `deployment/run-wsl-prom.sh`: convenience launcher for a lightweight Prometheus in WSL.
+
+### Prometheus Configuration & Optimizations
+
+**Scrape Interval**: `10 seconds` (configurable in `deployment/run-wsl-prom.sh`)
+- Provides high-resolution data for accurate event detection
+- Enables precise benchmark MB calculations (10s step matches scrape interval)
+- Bandwidth impact: ~3x more data than 30s scraping, but filtered Netdata metrics keep it manageable
+
+**Netdata Metric Filtering**: 
+- Only scrapes `netdata_net_speed_*` and `netdata_anomaly_detection_*` metrics
+- Reduces Netdata scrape size from ~649KB to ~5KB per scrape (~94% reduction)
+- Configured via `metric_relabel_configs` in Prometheus config
+
+**Dashboard Query Step**: `30 seconds`
+- Balances data resolution with query performance
+- Provides ~1440 samples for 12-hour view (vs ~61 with old dynamic step)
+- Benchmark calculations use 10s step for accuracy
+
+### Starlink Exporter
+
+The dashboard uses the standard `danopstech/starlink_exporter` to collect metrics from the Starlink dish:
+
+- **Metrics Collected**: Throughput, latency, packet loss, obstruction ratio, uptime, and more
+- **gRPC API**: Communicates with dish at `192.168.100.1:9201` using `GetStatus` endpoint
+- **Event Detection**: Since the local API doesn't expose event logs, the dashboard uses smart heuristic-based detection to infer events from metric patterns (see "Smart Starlink Event Detection" above)
+- **Dashboard Integration**: The Anomaly Detection chart overlays detected events as mark lines
+
+**Building from Source**:
+```bash
+cd /home/djc/starlink_exporter
+# The exporter_history.go file is already added
+go build -o /home/djc/levante/starlink-performance/logs/starlink_exporter ./cmd/starlink_exporter
+npm run restart:exporter  # Restart with new binary
+```
+
+### WiFi Link Speed Exporter (WSL2)
+
+The dashboard displays Windows WiFi adapter link speed via a custom Node.js exporter:
+
+- **Script**: `scripts/wifi-exporter.mjs` - Queries Windows WiFi adapter via PowerShell and exposes `windows_wifi_link_speed_mbps` metric
+- **Port**: 9818
+- **Auto-start**: Included in `npm run restart:stack` and systemd service
+- **Metric**: `windows_wifi_link_speed_mbps` - Current WiFi link speed in Mbps (e.g., 65, 866, 1200)
+
+This is the **negotiated connection speed** between your WiFi adapter and router, not your internet speed. It adjusts dynamically based on signal quality and will be lower than your actual Starlink throughput.
 
 Steps (example):
 ```bash
@@ -213,7 +329,7 @@ deployment/               # Remote write helpers for Prometheus → Grafana Clou
 
 ## License
 
-MIT (c) Levante Framework
+Licensed under the Non-Commercial License © 2025 David Cardinal. See `LICENSE` for full terms or contact digital-pro for commercial use.
 
 ---
 
@@ -252,10 +368,10 @@ STARLINK_TARGET=10.0.0.5:9817 npm run exporter:check
 ```
 
 - Verify dashboard read-path (Vercel → Grafana Cloud)
-  - Set `VERCEL_ALIAS` to your deployed hostname (e.g., `levante-performance.vercel.app` or your custom alias)
+  - Set `VERCEL_ALIAS` to your deployed hostname (e.g., `starlink-performance.vercel.app` or your custom alias)
 ```bash
-VERCEL_ALIAS=levante-performance.vercel.app npm run read:up | head -n1
-VERCEL_ALIAS=levante-performance.vercel.app npm run read:series | head -n1
+VERCEL_ALIAS=starlink-performance.vercel.app npm run read:up | head -n1
+VERCEL_ALIAS=starlink-performance.vercel.app npm run read:series | head -n1
 ```
 
 - Auto-discover exporter and wire automatically (optional)
