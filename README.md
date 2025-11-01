@@ -456,6 +456,43 @@ curl -s https://starlink-performance-digitalpros-projects.vercel.app/api/promql?
 ```
 If the PromQL call returns values, Grafana is receiving data and the dashboard will update within the next scrape interval.
 
+### ThousandEyes speedtest integration
+
+Use the Settings modal (⚙) to enable the speedtest chart and store metadata for
+your ThousandEyes Endpoint test. To populate the chart you must run the local
+exporter so Prometheus can scrape the results.
+
+1. Create or identify a ThousandEyes Endpoint test that captures throughput.
+   Note the **test ID**, the agent you want to query, and an API token with read
+   access.
+2. Launch the exporter on the helper machine:
+   ```bash
+   TE_USERNAME="you@example.com" \
+   TE_API_TOKEN="xxxx-xxxx" \
+   TE_TEST_ID=123456 \
+   TE_AGENT_ID=987654 \
+   TE_INTERVAL_SECONDS=300 \
+   npm run speedtest:exporter
+   ```
+   By default the exporter polls every 5 minutes, queries
+   `https://api.thousandeyes.com/v7/endpoint-tests/<TEST_ID>/metrics`, and serves
+   Prometheus metrics at `http://127.0.0.1:9819/metrics`. Override the endpoint
+   with `TE_METRICS_URL` or adjust the JSON paths (`TE_PATH_DOWNLOAD`, etc.) if
+   your response structure differs.
+3. Add a scrape job to the Prometheus helper (e.g., `deployment/prom-wsl.yml`):
+   ```yaml
+   - job_name: 'thousandeyes'
+     scrape_interval: 15s
+     static_configs:
+       - targets: ['127.0.0.1:9819']
+   ```
+4. Flip “Enable ThousandEyes integration” in the Settings modal. The cadence
+   field in the UI is informational; the exporter’s poll rate comes from
+   `TE_INTERVAL_SECONDS`.
+
+When the helper starts scraping `thousandeyes_speedtest_*` metrics, the new chart
+in the diagnostics grid will plot download/upload Mbps and latency automatically.
+
 Notes
 - The helper uses `deployment/run-wsl-prom.sh`, which reads your write token from `secrets/grafana_write_token.txt` and writes config to `deployment/prom-wsl.yml`.
 - Health endpoint: `GET /api/ping` now returns `{ ok: true, now: ... }` for quick checks.

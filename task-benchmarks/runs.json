@@ -1055,5 +1055,24 @@
     },
     "startPT": "12:30 PT",
     "finishPT": "12:31 PT"
+  },
+  {
+    "task": "intro",
+    "spec": "cypress/e2e/intro.cy.js",
+    "timestamp": "2025-11-01T01:07:54.474Z",
+    "finishedAt": "2025-11-01T01:08:28.151Z",
+    "status": "failed",
+    "real": "0m33.677s",
+    "realSeconds": 33.677,
+    "cypressDurationMs": 21256,
+    "totals": {
+      "tests": 1,
+      "passes": 1,
+      "failures": 0,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "18:07 PT",
+    "finishPT": "18:08 PT"
   }
 ]

@@ -23,19 +23,13 @@
           <option :value="21600">Last 6 hours</option>
           <option :value="43200">Last 12 hours</option>
         </select>
-        <button @click="refreshAll" style="padding:6px 10px; border:1px solid #08c; background:#08c; color:white; border-radius:6px; cursor:pointer; font-size:12px;">Refresh</button>
-        <span style="margin-left:16px; display:flex; align-items:center; gap:8px;">
-          <label style="display:flex; align-items:center; gap:4px;">
-            <span style="font-size:12px;">Baseline Down:</span>
-            <input v-model.number="baselineDownMbps" type="number" step="0.1" min="0" style="width:50px; padding:2px 4px; border:1px solid #ccd; border-radius:4px; text-align:right;" />
-            <span style="font-size:11px; color:#778;">Mbps</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:4px;">
-            <span style="font-size:12px;">Baseline Up:</span>
-            <input v-model.number="baselineUpMbps" type="number" step="0.1" min="0" style="width:50px; padding:2px 4px; border:1px solid #ccd; border-radius:4px; text-align:right;" />
-            <span style="font-size:11px; color:#778;">Mbps</span>
-          </label>
-        </span>
+        <div style="display:flex; gap:8px; align-items:center; margin-left:auto;">
+          <button @click="refreshAll" style="padding:6px 10px; border:1px solid #08c; background:#08c; color:white; border-radius:6px; cursor:pointer; font-size:12px;">Refresh</button>
+          <button @click="showSettings = true" style="padding:6px 10px; border:1px solid #555; background:#fff; color:#333; border-radius:6px; cursor:pointer; font-size:12px; display:flex; align-items:center; gap:6px;">
+            <span style="font-size:14px;">⚙</span>
+            Settings
+          </button>
+        </div>
       </div>
     </section>
 
@@ -182,6 +176,63 @@
       </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div v-if="showSettings" style="position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:9999;">
+      <div style="width: min(640px, 92%); background:white; border-radius:12px; border:1px solid #ddd; box-shadow:0 6px 24px rgba(0,0,0,0.2);">
+        <div style="padding:14px 18px; border-bottom:1px solid #eee; display:flex; align-items:center; justify-content:space-between;">
+          <h3 style="margin:0;">Dashboard Settings</h3>
+          <button @click="closeSettings" style="padding:4px 8px; border:1px solid #999; background:#f5f5f5; color:#333; border-radius:6px; cursor:pointer; font-size:12px;">Close</button>
+        </div>
+        <div style="padding:18px 20px; display:flex; flex-direction:column; gap:18px;">
+          <section>
+            <h4 style="margin:0 0 8px 0; font-size:14px; color:#334;">Baseline traffic offsets</h4>
+            <p style="margin:0 0 12px 0; font-size:12px; color:#667;">Subtracted from benchmark calculations to estimate pure task usage.</p>
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
+                <span>Baseline Down (Mbps)</span>
+                <input v-model.number="baselineDownMbps" type="number" step="0.1" min="0" style="width:120px; padding:6px 8px; border:1px solid #ccd; border-radius:6px; text-align:right;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
+                <span>Baseline Up (Mbps)</span>
+                <input v-model.number="baselineUpMbps" type="number" step="0.1" min="0" style="width:120px; padding:6px 8px; border:1px solid #ccd; border-radius:6px; text-align:right;" />
+              </label>
+            </div>
+          </section>
+
+          <section>
+            <h4 style="margin:0 0 8px 0; font-size:14px; color:#334; display:flex; align-items:center; gap:8px;">
+              ThousandEyes speed test
+              <span style="font-size:11px; color:#888; font-weight:normal;">(optional)</span>
+            </h4>
+            <p style="margin:0 0 12px 0; font-size:12px; color:#667;">Configure a lightweight throughput probe and surface it in the dashboard once metrics are available.</p>
+            <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#445; margin-bottom:12px;">
+              <input type="checkbox" v-model="teSettings.enabled" />
+              Enable ThousandEyes integration
+            </label>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
+                <span>Test ID</span>
+                <input v-model="teSettings.testId" type="text" placeholder="e.g. 123456" style="padding:6px 8px; border:1px solid #ccd; border-radius:6px;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
+                <span>Agent ID</span>
+                <input v-model="teSettings.agentId" type="text" placeholder="Agent to run the test" style="padding:6px 8px; border:1px solid #ccd; border-radius:6px;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
+                <span>API Token (read)</span>
+                <input v-model="teSettings.apiToken" type="password" placeholder="Optional for automated pulls" style="padding:6px 8px; border:1px solid #ccd; border-radius:6px;" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
+                <span>Cadence (seconds)</span>
+                <input v-model.number="teSettings.intervalSeconds" type="number" min="60" step="30" style="padding:6px 8px; border:1px solid #ccd; border-radius:6px;" />
+              </label>
+            </div>
+            <textarea v-model="teSettings.notes" placeholder="Notes or reminder about the scheduled test (bandwidth, duration, etc.)" style="margin-top:12px; width:100%; min-height:70px; padding:8px; border:1px solid #ccd; border-radius:6px; font-size:12px; color:#445;"></textarea>
+          </section>
+        </div>
+      </div>
+    </div>
+
     <!-- Diagnostic Charts Section -->
     <section style="margin-top: 24px;">
       <h3 style="margin:0 0 12px 0; color:#334;">Connection Diagnostics</h3>
@@ -235,10 +286,17 @@
           <v-chart v-else :option="firstSlotOption" autoresize style="height:80px;" />
         </div>
 
-        <!-- Placeholder for 8th chart (can add alerts later) -->
+        <!-- ThousandEyes speedtest chart -->
         <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
-          <div style="font-size:11px; color:#778; margin-bottom:4px;">Alerts</div>
-          <div style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">Coming soon</div>
+          <div style="font-size:11px; color:#778; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+            <span>Speedtest (Mbps)</span>
+            <span v-if="!teSettings.enabled" style="font-size:10px; color:#999;">Configure in Settings ⚙</span>
+          </div>
+          <div v-if="!teSettings.enabled" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px; text-align:center; padding:0 8px;">
+            Enable ThousandEyes integration in Settings to populate this chart.
+          </div>
+          <div v-else-if="!hasSpeedtestData" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No speedtest samples in selected window</div>
+          <v-chart v-else :option="speedtestOption" autoresize style="height:80px;" />
         </div>
       </div>
     </section>
@@ -284,8 +342,17 @@ const storedRange = localStorage.getItem('starlink_rangeSeconds');
 const rangeSeconds = ref<number>(storedRange ? Number(storedRange) : 3600);
 
 // Baseline traffic (Mbps) to subtract from benchmark calculations
-const baselineDownMbps = ref<number>(0.3);
-const baselineUpMbps = ref<number>(0.3);
+const isBrowser = typeof window !== 'undefined';
+const readNumberSetting = (key: string, fallback: number) => {
+  if (!isBrowser) return fallback;
+  const raw = window.localStorage.getItem(key);
+  if (raw === null) return fallback;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : fallback;
+};
+
+const baselineDownMbps = ref<number>(readNumberSetting('starlink_baseline_down', 0.3));
+const baselineUpMbps = ref<number>(readNumberSetting('starlink_baseline_up', 0.3));
 const rangeLabel = computed(() => (
   rangeSeconds.value === 600 ? '10 min' :
   rangeSeconds.value === 3600 ? '1 hour' :
@@ -294,6 +361,7 @@ const rangeLabel = computed(() => (
   rangeSeconds.value === 43200 ? '12 hours' : `${Math.round(rangeSeconds.value/3600)} hours`
 ));
 const showLossDetails = ref(false);
+const showSettings = ref(false);
 const lossStats = ref({
   current: 'N/A' as number | 'N/A',
   avg5m: 'N/A' as number | 'N/A',
@@ -304,6 +372,32 @@ const lossStats = ref({
   max1h: 'N/A' as number | 'N/A',
   timeWithLossPct15m: 'N/A' as number | 'N/A'
 });
+
+type ThousandEyesSettings = {
+  enabled: boolean;
+  testId: string;
+  agentId: string;
+  apiToken: string;
+  notes: string;
+  intervalSeconds: number;
+};
+
+const storedTe = isBrowser ? window.localStorage.getItem('starlink_te_settings') : null;
+const teSettings = ref<ThousandEyesSettings>(storedTe ? (() => {
+  try {
+    const parsed = JSON.parse(storedTe as string);
+    return {
+      enabled: Boolean(parsed.enabled),
+      testId: typeof parsed.testId === 'string' ? parsed.testId : '',
+      agentId: typeof parsed.agentId === 'string' ? parsed.agentId : '',
+      apiToken: typeof parsed.apiToken === 'string' ? parsed.apiToken : '',
+      notes: typeof parsed.notes === 'string' ? parsed.notes : '',
+      intervalSeconds: Number.isFinite(Number(parsed.intervalSeconds)) ? Number(parsed.intervalSeconds) : 300
+    };
+  } catch {
+    return { enabled: false, testId: '', agentId: '', apiToken: '', notes: '', intervalSeconds: 300 };
+  }
+})() : { enabled: false, testId: '', agentId: '', apiToken: '', notes: '', intervalSeconds: 300 });
 
 // Desired order: Down (upper-left), Latency (upper-right), Up (lower-left), Packet Loss (lower-right)
 const metricCards = [
@@ -652,6 +746,28 @@ async function refreshAll() {
 
   // Starlink Events: detect state changes and obstructions
   await loadStarlinkEvents(seconds, 30, fixedEnd);
+
+  if (teSettings.value.enabled) {
+    try {
+      const [speedDown, speedUp, speedLatency] = await Promise.all([
+        fetchRangeProm('thousandeyes_speedtest_down_mbps', seconds, step, fixedEnd),
+        fetchRangeProm('thousandeyes_speedtest_up_mbps', seconds, step, fixedEnd),
+        fetchRangeProm('thousandeyes_speedtest_latency_ms', seconds, step, fixedEnd)
+      ]);
+      speedtestDownSeries.value = speedDown;
+      speedtestUpSeries.value = speedUp;
+      speedtestLatencySeries.value = speedLatency;
+    } catch (error) {
+      console.error('Failed to load ThousandEyes speedtest metrics:', error);
+      speedtestDownSeries.value = [];
+      speedtestUpSeries.value = [];
+      speedtestLatencySeries.value = [];
+    }
+  } else {
+    speedtestDownSeries.value = [];
+    speedtestUpSeries.value = [];
+    speedtestLatencySeries.value = [];
+  }
 }
 
 async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: number) {
@@ -883,6 +999,10 @@ function closeLossDetails() {
   showLossDetails.value = false;
 }
 
+function closeSettings() {
+  showSettings.value = false;
+}
+
 const latencySeries = ref<Array<[number, number]>>([]);
 const bandwidthDownSeries = ref<Array<[number, number]>>([]);
 const bandwidthUpSeries = ref<Array<[number, number]>>([]);
@@ -897,6 +1017,11 @@ const benchRuns = ref<Array<{ task: string; start: number; end: number }>>([]);
 const anomalySeries = ref<Array<[number, number]>>([]);
 const starlinkEvents = ref<Array<{ time: string; timestamp: number; message: string; icon: string; color: string }>>([]);
 
+// ThousandEyes speedtest series
+const speedtestDownSeries = ref<Array<[number, number]>>([]);
+const speedtestUpSeries = ref<Array<[number, number]>>([]);
+const speedtestLatencySeries = ref<Array<[number, number]>>([]);
+
 // Diagnostic charts series
 const snrSeries = ref<Array<[number, number]>>([]);
 const dishStateSeries = ref<Array<[number, number]>>([]);
@@ -910,6 +1035,7 @@ const firstSlotSeries = ref<Array<[number, number]>>([]);
 const hasLatencyData = computed(() => latencySeries.value.length > 0 || packetLossSeries.value.length > 0);
 const hasBandwidthData = computed(() => bandwidthDownSeries.value.length > 0 || bandwidthUpSeries.value.length > 0 || microLossSeries.value.length > 0 || downMbPerMinSeries.value.length > 0 || upMbPerMinSeries.value.length > 0 || downMbPer10MinSeries.value.length > 0 || upMbPer10MinSeries.value.length > 0);
 const hasAnomalyData = computed(() => anomalySeries.value.length > 0);
+const hasSpeedtestData = computed(() => speedtestDownSeries.value.length > 0 || speedtestUpSeries.value.length > 0 || speedtestLatencySeries.value.length > 0);
 
 const latencyOption = computed(() => {
   const now = Date.now();
@@ -1226,6 +1352,54 @@ const anomalyOption = computed(() => {
   };
 });
 
+const speedtestOption = computed(() => {
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
+    grid: { left: 50, right: 70, top: 54, bottom: 40 },
+    legend: { top: 6, data: ['Download (Mbps)', 'Upload (Mbps)', 'Latency (ms)'] },
+    xAxis: {
+      type: 'time',
+      axisLabel: {
+        formatter: (value: number) => new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Los_Angeles',
+          hour: '2-digit', minute: '2-digit', hour12: false
+        }).format(new Date(value))
+      }
+    },
+    yAxis: [
+      { type: 'value', name: 'Mbps' },
+      { type: 'value', name: 'ms', position: 'right' }
+    ],
+    series: [
+      {
+        type: 'line',
+        name: 'Download (Mbps)',
+        data: speedtestDownSeries.value,
+        smooth: true,
+        showSymbol: false,
+        lineStyle: { width: 2, color: '#1a73e8' }
+      },
+      {
+        type: 'line',
+        name: 'Upload (Mbps)',
+        data: speedtestUpSeries.value,
+        smooth: true,
+        showSymbol: false,
+        lineStyle: { width: 2, color: '#34a853' }
+      },
+      {
+        type: 'line',
+        name: 'Latency (ms)',
+        data: speedtestLatencySeries.value,
+        smooth: true,
+        showSymbol: false,
+        lineStyle: { width: 1.5, type: 'dashed', color: '#8e24aa' },
+        yAxisIndex: 1
+      }
+    ]
+  };
+});
+
 // Diagnostic chart options
 const snrOption = computed(() => {
   const now = Date.now();
@@ -1400,7 +1574,38 @@ function onBandwidthLegendChange(event: any) {
 
 // Watch rangeSeconds and save to localStorage
 watch(rangeSeconds, (newVal) => {
-  localStorage.setItem('starlink_rangeSeconds', String(newVal));
+  if (isBrowser) {
+    localStorage.setItem('starlink_rangeSeconds', String(newVal));
+  }
+});
+
+watch(baselineDownMbps, (val) => {
+  if (isBrowser && typeof val === 'number' && Number.isFinite(val)) {
+    localStorage.setItem('starlink_baseline_down', String(val));
+  }
+});
+
+watch(baselineUpMbps, (val) => {
+  if (isBrowser && typeof val === 'number' && Number.isFinite(val)) {
+    localStorage.setItem('starlink_baseline_up', String(val));
+  }
+});
+
+watch(teSettings, (val) => {
+  if (!isBrowser) return;
+  try {
+    localStorage.setItem('starlink_te_settings', JSON.stringify(val));
+  } catch {}
+}, { deep: true });
+
+watch(() => teSettings.value.enabled, (enabled) => {
+  if (enabled) {
+    refreshAll();
+  } else {
+    speedtestDownSeries.value = [];
+    speedtestUpSeries.value = [];
+    speedtestLatencySeries.value = [];
+  }
 });
 
 onMounted(() => {
