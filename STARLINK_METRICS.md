@@ -39,6 +39,34 @@ This document describes all Starlink metrics collected by the dashboard and thei
 - Detects very brief signal interruptions
 - Useful for identifying intermittent issues that might not show up in regular packet loss metrics
 
+### `starlink_speedtest_download_mbps`
+**What it is:** Latest download throughput in Mbps reported by the iPerf3 exporter.
+
+**Why it's useful:**
+- Provides periodic synthetic throughput validation (“Internet at a Glance”).
+- Alerts you if raw downloader performance is diverging from Prometheus bandwidth samples.
+
+### `starlink_speedtest_upload_mbps`
+**What it is:** Latest upload throughput in Mbps reported by the iPerf3 exporter.
+
+**Why it's useful:**
+- Gives visibility into uplink capacity independent of Starlink’s telemetry.
+- Detects congestion or throttling that might not surface in micro-loss metrics.
+
+### `starlink_speedtest_last_success_timestamp_seconds`
+**What it is:** Unix timestamp of the most recent successful speedtest.
+
+**Why it's useful:**
+- Lets you alert on exporter failures (“no successful test for 30 minutes”).
+- Drives the “Updated n minutes ago” line in the dashboard card.
+
+### `starlink_speedtest_last_run_status`
+**What it is:** Gauge indicating success (1) or failure (0) of the most recent test.
+
+**Why it's useful:**
+- Quick PromQL alert on exporter failures or unreachable public endpoints.
+- Combined with timestamps, you can see when public servers rate-limit or go offline.
+
 ## Signal Quality Metrics
 
 ### `starlink_dish_snr`

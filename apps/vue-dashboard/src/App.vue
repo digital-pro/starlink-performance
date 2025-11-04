@@ -23,6 +23,11 @@
           <option :value="21600">Last 6 hours</option>
           <option :value="43200">Last 12 hours</option>
         </select>
+        <label style="display:flex; align-items:center; gap:4px; font-size:12px; color:#556;">
+          <span>Offset:</span>
+          <input v-model.number="rangeShiftMinutes" type="number" min="0" step="30" style="width:60px; padding:3px 6px; border:1px solid #ccd; border-radius:6px; text-align:right;" />
+          <span>min</span>
+        </label>
         <div style="display:flex; gap:8px; align-items:center; margin-left:auto;">
           <button @click="refreshAll" style="padding:6px 10px; border:1px solid #08c; background:#08c; color:white; border-radius:6px; cursor:pointer; font-size:12px;">Refresh</button>
           <button @click="showSettings = true" style="padding:6px 10px; border:1px solid #555; background:#fff; color:#333; border-radius:6px; cursor:pointer; font-size:12px; display:flex; align-items:center; gap:6px;">
@@ -38,49 +43,41 @@
 
     <!-- Totals and Diagnostics in one row -->
     <section style="margin-top: 12px;">
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
-          <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Sum of downlink Mbps over last hour converted to GB (assumes 15s scrape interval)">
-            <div style="font-size:11px; color:#778;">Download (last hour)</div>
-            <div style="font-size:18px; font-weight:600;">{{ typeof totalDownGb === 'number' ? totalDownGb.toFixed(2) : 'N/A' }} GB</div>
-          </div>
-          <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Windows WiFi adapter link speed (Mbps). This is the negotiated connection speed between your WiFi adapter and Starlink router.">
-            <div style="font-size:11px; color:#778;">WiFi Speed</div>
-            <div style="font-size:18px; font-weight:600;">{{ typeof nicSpeedMbps === 'number' && Number.isFinite(nicSpeedMbps) ? Math.floor(nicSpeedMbps) : 'N/A' }} Mbps</div>
-          </div>
-          <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="GPS location of Starlink dish">
-            <div style="font-size:11px; color:#778;">Location</div>
-            <div style="display:flex; align-items:center; gap:4px;">
-              <div style="font-size:16px; font-weight:600;">{{ formatGpsLocation() }}</div>
-              <img 
-                v-if="gpsLatitude !== null && gpsLongitude !== null"
-                @click="showMapModal = true"
-                :src="`https://maps.googleapis.com/maps/api/staticmap?center=${gpsLatitude},${gpsLongitude}&zoom=15&size=60x60&markers=color:red%7C${gpsLatitude},${gpsLongitude}&key=AIzaSyBFw0Qbyq9zTFTd-tUY6d13V3-kNgJGLrI`"
-                alt="Location map"
-                style="cursor:pointer; width:28px; height:28px; border-radius:3px; border:1px solid #ddd; flex-shrink:0;"
-                title="Click to open larger map"
-              />
-            </div>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:8px;">
+        <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Sum of downlink Mbps over last hour converted to GB (assumes 15s scrape interval)">
+          <div style="font-size:11px; color:#778;">Download (last hour)</div>
+          <div style="font-size:18px; font-weight:600;">{{ typeof totalDownGb === 'number' ? totalDownGb.toFixed(2) : 'N/A' }} GB</div>
+        </div>
+        <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Windows WiFi adapter link speed (Mbps). This is the negotiated connection speed between your WiFi adapter and Starlink router.">
+          <div style="font-size:11px; color:#778;">WiFi Speed</div>
+          <div style="font-size:18px; font-weight:600;">{{ typeof nicSpeedMbps === 'number' && Number.isFinite(nicSpeedMbps) ? Math.floor(nicSpeedMbps) : 'N/A' }} Mbps</div>
+        </div>
+        <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="GPS location of Starlink dish">
+          <div style="font-size:11px; color:#778;">Location</div>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <div style="font-size:16px; font-weight:600;">{{ formatGpsLocation() }}</div>
+            <img 
+              v-if="gpsLatitude !== null && gpsLongitude !== null"
+              @click="showMapModal = true"
+              :src="`https://maps.googleapis.com/maps/api/staticmap?center=${gpsLatitude},${gpsLongitude}&zoom=15&size=60x60&markers=color:red%7C${gpsLatitude},${gpsLongitude}&key=AIzaSyBFw0Qbyq9zTFTd-tUY6d13V3-kNgJGLrI`"
+              alt="Location map"
+              style="cursor:pointer; width:28px; height:28px; border-radius:3px; border:1px solid #ddd; flex-shrink:0;"
+              title="Click to open larger map"
+            />
           </div>
         </div>
-        <div style="border:1px solid #eee; border-radius:10px; padding:10px; background:#fff;" title="Diagnostic flags derived from recording rules for common issues">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <strong style="font-size:13px;">Diagnostics</strong>
-            <small style="color:#778; font-size:11px;">spike / micro-loss / outage / obstruction</small>
+        <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;">
+          <div style="font-size:11px; color:#778; display:flex; justify-content:space-between; align-items:center;">
+            <span>Internet at a Glance</span>
+            <span style="font-size:10px; color:#999;">Server: {{ speedtestServerLabel }}</span>
           </div>
-          <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px;">
-            <div style="display:flex; align-items:center; justify-content:center;">
-              <span :style="flagStyle(flags.latencySpike)" title="Latency spike: starlink_latency_spike > 0 indicates short-term spike vs baseline" style="font-size:11px; padding:4px 6px;">Spike</span>
-            </div>
-            <div style="display:flex; align-items:center; justify-content:center;">
-              <span :style="flagStyle(flags.microLoss)" title="Micro‑loss: sustained 1–2% packet loss typical on Starlink" style="font-size:11px; padding:4px 6px;">Micro‑loss</span>
-            </div>
-            <div style="display:flex; align-items:center; justify-content:center;">
-              <span :style="flagStyle(flags.outage)" title="Outage: starlink_outage_active > 0 when outage duration increases" style="font-size:11px; padding:4px 6px;">Outage</span>
-            </div>
-            <div style="display:flex; align-items:center; justify-content:center;">
-              <span :style="flagStyle(flags.obstruction)" title="Obstruction: obstruction indicator > 0.2 over 5m" style="font-size:11px; padding:4px 6px;">Obstruct</span>
-            </div>
+          <div v-if="metrics.speedtestDown === 'N/A' || metrics.speedtestUp === 'N/A'" style="font-size:11px; color:#99a; margin-top:12px;">
+            Run the iPerf speedtest exporter to populate this card.
+          </div>
+          <div v-else style="display:flex; flex-direction:column; gap:2px; margin-top:6px;">
+            <div style="font-size:16px; font-weight:600; color:#1a73e8;">↓ {{ formatSpeedMetric(metrics.speedtestDown) }}</div>
+            <div style="font-size:16px; font-weight:600; color:#34a853;">↑ {{ formatSpeedMetric(metrics.speedtestUp) }}</div>
+            <div style="font-size:11px; color:#667;">Updated {{ formatRelativeTimestamp(metrics.speedtestUpdated) }} · Cadence {{ speedtestCadenceLabel }}</div>
           </div>
         </div>
       </div>
@@ -196,38 +193,79 @@
                 <span>Baseline Up (Mbps)</span>
                 <input v-model.number="baselineUpMbps" type="number" step="0.1" min="0" style="width:120px; padding:6px 8px; border:1px solid #ccd; border-radius:6px; text-align:right;" />
               </label>
+              <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
+                <span>Logging interval (s)</span>
+                <input v-model.number="loggingIntervalSeconds" type="number" min="5" step="5" style="width:120px; padding:6px 8px; border:1px solid #ccd; border-radius:6px; text-align:right;" />
+              </label>
             </div>
           </section>
 
           <section>
-            <h4 style="margin:0 0 8px 0; font-size:14px; color:#334; display:flex; align-items:center; gap:8px;">
-              ThousandEyes speed test
-              <span style="font-size:11px; color:#888; font-weight:normal;">(optional)</span>
-            </h4>
-            <p style="margin:0 0 12px 0; font-size:12px; color:#667;">Configure a lightweight throughput probe and surface it in the dashboard once metrics are available.</p>
-            <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#445; margin-bottom:12px;">
-              <input type="checkbox" v-model="teSettings.enabled" />
-              Enable ThousandEyes integration
-            </label>
+            <h4 style="margin:0 0 8px 0; font-size:14px; color:#334;">Logging & notes</h4>
+            <p style="margin:0 0 12px 0; font-size:12px; color:#667;">Add context for current monitoring session.</p>
+            <textarea v-model="sessionNotes" placeholder="e.g. weather, customer activity, recent restarts" style="width:100%; min-height:90px; padding:8px; border:1px solid #ccd; border-radius:6px; font-size:12px; color:#445;"></textarea>
+          </section>
+
+          <section>
+            <h4 style="margin:0 0 8px 0; font-size:14px; color:#334;">Internet at a Glance speedtest</h4>
+            <p style="margin:0 0 12px 0; font-size:12px; color:#667;">These selections help keep the dashboard and the local exporter in sync. Make sure the exporter is launched with the same server and cadence.</p>
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
               <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
-                <span>Test ID</span>
-                <input v-model="teSettings.testId" type="text" placeholder="e.g. 123456" style="padding:6px 8px; border:1px solid #ccd; border-radius:6px;" />
+                <span>Preferred server</span>
+                <select v-model="speedtestSettings.server" style="padding:6px 8px; border:1px solid #ccd; border-radius:6px;">
+                  <option v-for="opt in speedtestServerOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
               </label>
               <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
-                <span>Agent ID</span>
-                <input v-model="teSettings.agentId" type="text" placeholder="Agent to run the test" style="padding:6px 8px; border:1px solid #ccd; border-radius:6px;" />
-              </label>
-              <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
-                <span>API Token (read)</span>
-                <input v-model="teSettings.apiToken" type="password" placeholder="Optional for automated pulls" style="padding:6px 8px; border:1px solid #ccd; border-radius:6px;" />
-              </label>
-              <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
-                <span>Cadence (seconds)</span>
-                <input v-model.number="teSettings.intervalSeconds" type="number" min="60" step="30" style="padding:6px 8px; border:1px solid #ccd; border-radius:6px;" />
+                <span>Run every (minutes)</span>
+                <input v-model.number="speedtestSettings.intervalMinutes" type="number" min="5" step="5" style="padding:6px 8px; border:1px solid #ccd; border-radius:6px;" />
               </label>
             </div>
-            <textarea v-model="teSettings.notes" placeholder="Notes or reminder about the scheduled test (bandwidth, duration, etc.)" style="margin-top:12px; width:100%; min-height:70px; padding:8px; border:1px solid #ccd; border-radius:6px; font-size:12px; color:#445;"></textarea>
+            <div style="margin-top:10px; font-size:11px; color:#667;">
+              Exporter command: <code style="background:#f5f5f5; padding:2px 4px; border-radius:4px;">SPEEDTEST_SERVER={{ speedtestSettings.server }} SPEEDTEST_INTERVAL_SECONDS={{ speedtestSettings.intervalMinutes * 60 }} npm run speedtest:exporter</code>
+            </div>
+          </section>
+
+          <section>
+            <h4 style="margin:0 0 8px 0; font-size:14px; color:#334;">Diagnostic visibility</h4>
+            <p style="margin:0 0 12px 0; font-size:12px; color:#667;">Enable charts that currently report zero data so you can keep them handy when values return.</p>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px;">
+              <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border:1px solid #ccd; border-radius:6px; font-size:12px; color:#445; background:#f8f9fb;">
+                <span>SNR (dB)</span>
+                <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#556;">
+                  <span>Visible</span>
+                  <input type="checkbox" v-model="diagnosticVisibility.snr" />
+                </label>
+              </label>
+              <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border:1px solid #ccd; border-radius:6px; font-size:12px; color:#445; background:#f8f9fb;">
+                <span>Dish State</span>
+                <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#556;">
+                  <span>Visible</span>
+                  <input type="checkbox" v-model="diagnosticVisibility.dishState" />
+                </label>
+              </label>
+              <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border:1px solid #ccd; border-radius:6px; font-size:12px; color:#445; background:#f8f9fb;">
+                <span>Backup Beam</span>
+                <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#556;">
+                  <span>Visible</span>
+                  <input type="checkbox" v-model="diagnosticVisibility.backupBeam" />
+                </label>
+              </label>
+              <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border:1px solid #ccd; border-radius:6px; font-size:12px; color:#445; background:#f8f9fb;">
+                <span>Time to Slot End</span>
+                <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#556;">
+                  <span>Visible</span>
+                  <input type="checkbox" v-model="diagnosticVisibility.slotEnd" />
+                </label>
+              </label>
+              <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border:1px solid #ccd; border-radius:6px; font-size:12px; color:#445; background:#f8f9fb;">
+                <span>First Slot</span>
+                <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#556;">
+                  <span>Visible</span>
+                  <input type="checkbox" v-model="diagnosticVisibility.firstSlot" />
+                </label>
+              </label>
+            </div>
           </section>
         </div>
       </div>
@@ -236,67 +274,97 @@
     <!-- Diagnostic Charts Section -->
     <section style="margin-top: 24px;">
       <h3 style="margin:0 0 12px 0; color:#334;">Connection Diagnostics</h3>
-      <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px;">
-        <!-- SNR Chart -->
-        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
-          <div style="font-size:11px; color:#778; margin-bottom:4px;">SNR (dB)</div>
-          <div v-if="snrSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="snrOption" autoresize style="height:80px;" />
-        </div>
-
-        <!-- Dish State Chart -->
-        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
-          <div style="font-size:11px; color:#778; margin-bottom:4px;">Dish State</div>
-          <div v-if="dishStateSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="dishStateOption" autoresize style="height:80px;" />
-        </div>
-
-        <!-- Backup Beam Chart -->
-        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
-          <div style="font-size:11px; color:#778; margin-bottom:4px;">Backup Beam</div>
-          <div v-if="backupBeamSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="backupBeamOption" autoresize style="height:80px;" />
-        </div>
-
-        <!-- Time to Slot End Chart -->
-        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
-          <div style="font-size:11px; color:#778; margin-bottom:4px;">Time to Slot End (s)</div>
-          <div v-if="slotEndSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="slotEndOption" autoresize style="height:80px;" />
-        </div>
-
-        <!-- Bore Sight Azimuth Chart -->
-        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+      <div style="display:grid; grid-template-columns: minmax(200px, 1fr) repeat(3, minmax(0, 1fr)); gap:8px; grid-auto-rows: 150px; align-items:stretch;">
+        <!-- Azimuth Chart -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white; grid-column:1; grid-row:1;">
           <div style="font-size:11px; color:#778; margin-bottom:4px;">Azimuth (deg)</div>
-          <div v-if="azimuthSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="azimuthOption" autoresize style="height:80px;" />
+          <div v-if="azimuthSeries.length === 0" style="height:100%; min-height:120px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="azimuthOption" autoresize style="height:120px;" />
         </div>
 
-        <!-- Bore Sight Elevation Chart -->
-        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+        <!-- Elevation Chart -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white; grid-column:1; grid-row:2;">
           <div style="font-size:11px; color:#778; margin-bottom:4px;">Elevation (deg)</div>
-          <div v-if="elevationSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="elevationOption" autoresize style="height:80px;" />
+          <div v-if="elevationSeries.length === 0" style="height:100%; min-height:120px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="elevationOption" autoresize style="height:120px;" />
         </div>
 
-        <!-- Time to First Nonempty Slot Chart -->
-        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
-          <div style="font-size:11px; color:#778; margin-bottom:4px;">First Slot (s)</div>
-          <div v-if="firstSlotSeries.length === 0" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="firstSlotOption" autoresize style="height:80px;" />
+        <!-- Speedtest Supercard -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:12px; background:white; grid-column:2 / span 3; grid-row:1 / span 2; display:flex; flex-direction:column;">
+          <div style="font-size:11px; color:#778; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <span>Internet at a Glance</span>
+            <span v-if="showSyntheticSpeedtest" style="font-size:10px; color:#999;">{{ speedtestServerLabel }} · every {{ speedtestCadenceLabel }}</span>
+            <span v-else-if="hasFallbackSpeedData" style="font-size:10px; color:#999;">Synthetic test unavailable – showing live Starlink throughput</span>
+            <span v-else style="font-size:10px; color:#999;">Synthetic and live metrics unavailable</span>
+          </div>
+          <div v-if="showSyntheticSpeedtest" style="flex:1; min-height:240px;">
+            <v-chart :option="speedtestOption" autoresize style="height:100%;" />
+          </div>
+          <div v-else-if="hasFallbackSpeedData" style="flex:1; min-height:240px;">
+            <v-chart :option="speedtestFallbackOption" autoresize style="height:100%;" />
+            <div style="margin-top:6px; font-size:10px; color:#8896af;">Tip: synthetic speedtests are disabled or failing. Showing rolling Prometheus throughput instead.</div>
+          </div>
+          <div v-else style="flex:1; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px; text-align:center; padding:0 16px;">
+            Waiting for metrics. Ensure the iPerf exporter is running on the helper box.
+          </div>
+          <div style="margin-top:12px; display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:8px; font-size:12px; color:#445;">
+            <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
+              <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Latest download</div>
+              <div style="font-size:18px; font-weight:600; color:#1a73e8;">{{ formatSpeedMetric(displayDownloadMbps !== null ? displayDownloadMbps : 'N/A') }}</div>
+            </div>
+            <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
+              <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Latest upload</div>
+              <div style="font-size:18px; font-weight:600; color:#34a853;">{{ formatSpeedMetric(displayUploadMbps !== null ? displayUploadMbps : 'N/A') }}</div>
+            </div>
+            <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
+              <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Last success</div>
+              <div style="font-size:13px; font-weight:500; color:#334;">
+                {{ showSyntheticSpeedtest ? formatRelativeTimestamp(metrics.speedtestUpdated) : (hasFallbackSpeedData ? 'Live telemetry' : 'N/A') }}
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <!-- ThousandEyes speedtest chart -->
-        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+      <div v-if="anyDiagnosticsVisible" style="margin-top:16px; display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:8px;">
+        <div v-if="diagnosticVisibility.snr" style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
           <div style="font-size:11px; color:#778; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
-            <span>Speedtest (Mbps)</span>
-            <span v-if="!teSettings.enabled" style="font-size:10px; color:#999;">Configure in Settings ⚙</span>
+            <span>SNR (dB)</span>
           </div>
-          <div v-if="!teSettings.enabled" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px; text-align:center; padding:0 8px;">
-            Enable ThousandEyes integration in Settings to populate this chart.
+          <div v-if="snrSeries.length === 0" style="height:100px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="snrOption" autoresize style="height:120px;" />
+        </div>
+
+        <div v-if="diagnosticVisibility.dishState" style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+            <span>Dish State</span>
           </div>
-          <div v-else-if="!hasSpeedtestData" style="height:80px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No speedtest samples in selected window</div>
-          <v-chart v-else :option="speedtestOption" autoresize style="height:80px;" />
+          <div v-if="dishStateSeries.length === 0" style="height:100px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="dishStateOption" autoresize style="height:120px;" />
+        </div>
+
+        <div v-if="diagnosticVisibility.backupBeam" style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+            <span>Backup Beam</span>
+          </div>
+          <div v-if="backupBeamSeries.length === 0" style="height:100px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="backupBeamOption" autoresize style="height:120px;" />
+        </div>
+
+        <div v-if="diagnosticVisibility.slotEnd" style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+            <span>Time to Slot End (s)</span>
+          </div>
+          <div v-if="slotEndSeries.length === 0" style="height:100px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="slotEndOption" autoresize style="height:120px;" />
+        </div>
+
+        <div v-if="diagnosticVisibility.firstSlot" style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+            <span>First Slot (s)</span>
+          </div>
+          <div v-if="firstSlotSeries.length === 0" style="height:100px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="firstSlotOption" autoresize style="height:120px;" />
         </div>
       </div>
     </section>
@@ -304,7 +372,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, reactive } from 'vue';
 import axios from 'axios';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -319,7 +387,10 @@ const metrics = ref<Record<string, number | string>>({
   packetLoss: 'N/A',
   bandwidthDown: 'N/A',
   bandwidthUp: 'N/A',
-  anomalyRate: 'N/A'
+  anomalyRate: 'N/A',
+  speedtestDown: 'N/A',
+  speedtestUp: 'N/A',
+  speedtestUpdated: 'N/A'
 });
 
 const flags = ref<{ latencySpike: boolean; microLoss: boolean; outage: boolean; obstruction: boolean }>({
@@ -337,11 +408,6 @@ const gpsLatitude = ref<number | null>(null);
 const gpsLongitude = ref<number | null>(null);
 const showMapModal = ref(false);
 // bucket info removed
-// Initialize rangeSeconds from localStorage, default to 1 hour
-const storedRange = localStorage.getItem('starlink_rangeSeconds');
-const rangeSeconds = ref<number>(storedRange ? Number(storedRange) : 3600);
-
-// Baseline traffic (Mbps) to subtract from benchmark calculations
 const isBrowser = typeof window !== 'undefined';
 const readNumberSetting = (key: string, fallback: number) => {
   if (!isBrowser) return fallback;
@@ -350,6 +416,48 @@ const readNumberSetting = (key: string, fallback: number) => {
   const num = Number(raw);
   return Number.isFinite(num) ? num : fallback;
 };
+
+const computeAxisRange = (series: Array<[number, number]>, paddingFraction: number, fallback: { min: number; max: number }, options: { includeZero?: boolean; minSpan?: number } = {}) => {
+  const values = series.map(([, v]) => Number(v)).filter((v) => Number.isFinite(v));
+  if (values.length === 0) return fallback;
+
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return fallback;
+
+  if (min === max) {
+    const magnitude = Math.abs(min) || Math.abs(fallback.max - fallback.min) || 1;
+    const pad = Math.max(magnitude * paddingFraction, magnitude * 0.1, options.minSpan ?? 0.01);
+    const lower = options.includeZero ? Math.min(0, min - pad) : min - pad;
+    const upper = options.includeZero ? Math.max(0, max + pad) : max + pad;
+    return { min: lower, max: upper };
+  }
+
+  let span = max - min;
+  const pad = span > 0 ? span * paddingFraction : Math.max(Math.abs(min), Math.abs(max)) * paddingFraction;
+  const safePad = Math.max(pad, options.minSpan ?? 0.01);
+  let lower = min - safePad;
+  let upper = max + safePad;
+
+  if (options.includeZero) {
+    lower = Math.min(0, lower);
+    upper = Math.max(0, upper);
+    if (upper - lower < span + safePad) {
+      upper = Math.max(0, max + safePad);
+      lower = Math.min(0, min - safePad);
+    }
+  }
+
+  return { min: lower, max: upper };
+};
+
+// Initialize rangeSeconds from localStorage, default to 1 hour
+const storedRange = isBrowser ? window.localStorage.getItem('starlink_rangeSeconds') : null;
+const defaultRangeSeconds = storedRange ? Number(storedRange) : 3600;
+const rangeSeconds = ref<number>((Number.isFinite(defaultRangeSeconds) && defaultRangeSeconds > 0) ? defaultRangeSeconds : 3600);
+const rangeShiftMinutes = ref<number>(readNumberSetting('starlink_range_shift_minutes', 0));
+const loggingIntervalSeconds = ref<number>(readNumberSetting('starlink_logging_interval_seconds', 60));
 
 const baselineDownMbps = ref<number>(readNumberSetting('starlink_baseline_down', 0.3));
 const baselineUpMbps = ref<number>(readNumberSetting('starlink_baseline_up', 0.3));
@@ -373,31 +481,40 @@ const lossStats = ref({
   timeWithLossPct15m: 'N/A' as number | 'N/A'
 });
 
-type ThousandEyesSettings = {
-  enabled: boolean;
-  testId: string;
-  agentId: string;
-  apiToken: string;
-  notes: string;
-  intervalSeconds: number;
-};
+const speedtestServerOptions = [
+  { label: 'EENet (Tallinn, Estonia)', value: 'iperf.eenet.ee' },
+  { label: 'Bouygues Telecom (Paris, France)', value: 'iperf.bouygues.net' },
+  { label: 'Serverius (Amsterdam, NL)', value: 'speedtest.serverius.net' },
+  { label: 'Leaseweb (Frankfurt, DE)', value: 'iperf.frankfurt.linode.com' },
+  { label: 'HE.NET (Fremont, US)', value: 'iperf.he.net' },
+  { label: 'Online.net (Paris, FR) – port 5202', value: 'ping.online.net:5202' }
+];
 
-const storedTe = isBrowser ? window.localStorage.getItem('starlink_te_settings') : null;
-const teSettings = ref<ThousandEyesSettings>(storedTe ? (() => {
+const storedSpeedtestServer = isBrowser ? window.localStorage.getItem('starlink_speedtest_server') : null;
+const speedtestSettings = ref<{ server: string; intervalMinutes: number }>({
+  server: storedSpeedtestServer && speedtestServerOptions.some((opt) => opt.value === storedSpeedtestServer)
+    ? storedSpeedtestServer
+    : speedtestServerOptions[0].value,
+  intervalMinutes: readNumberSetting('starlink_speedtest_interval_minutes', 15)
+});
+
+const storedDiagnosticsVisibility = (() => {
+  if (!isBrowser) return {} as Record<string, boolean>;
   try {
-    const parsed = JSON.parse(storedTe as string);
-    return {
-      enabled: Boolean(parsed.enabled),
-      testId: typeof parsed.testId === 'string' ? parsed.testId : '',
-      agentId: typeof parsed.agentId === 'string' ? parsed.agentId : '',
-      apiToken: typeof parsed.apiToken === 'string' ? parsed.apiToken : '',
-      notes: typeof parsed.notes === 'string' ? parsed.notes : '',
-      intervalSeconds: Number.isFinite(Number(parsed.intervalSeconds)) ? Number(parsed.intervalSeconds) : 300
-    };
+    const raw = localStorage.getItem('starlink_diagnostics_visibility');
+    return raw ? JSON.parse(raw) : {};
   } catch {
-    return { enabled: false, testId: '', agentId: '', apiToken: '', notes: '', intervalSeconds: 300 };
+    return {};
   }
-})() : { enabled: false, testId: '', agentId: '', apiToken: '', notes: '', intervalSeconds: 300 });
+})();
+
+const diagnosticVisibility = reactive({
+  snr: Boolean((storedDiagnosticsVisibility as any).snr),
+  dishState: Boolean((storedDiagnosticsVisibility as any).dishState),
+  backupBeam: Boolean((storedDiagnosticsVisibility as any).backupBeam),
+  slotEnd: Boolean((storedDiagnosticsVisibility as any).slotEnd),
+  firstSlot: Boolean((storedDiagnosticsVisibility as any).firstSlot)
+});
 
 // Desired order: Down (upper-left), Latency (upper-right), Up (lower-left), Packet Loss (lower-right)
 const metricCards = [
@@ -420,9 +537,38 @@ function format3(value: number | string): string | number {
 
 const formatTooltipValue = (value: number | string): string => {
   const num = Number(value);
-  if (Number.isFinite(num)) return num.toFixed(2);
-  return typeof value === 'string' ? value : '';
+  if (!Number.isFinite(num)) return typeof value === 'string' ? value : String(value ?? '');
+  const abs = Math.abs(num);
+  if (abs >= 100) return num.toFixed(0);
+  if (abs >= 1) return num.toFixed(2);
+  if (abs >= 0.01) return num.toFixed(3);
+  return num.toExponential(2);
 };
+
+function formatSpeedMetric(value: number | string): string {
+  const num = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(num)) return 'N/A';
+  if (Math.abs(num) >= 100) return `${num.toFixed(0)} Mbps`;
+  if (Math.abs(num) >= 10) return `${num.toFixed(1)} Mbps`;
+  return `${num.toFixed(2)} Mbps`;
+}
+
+function formatRelativeTimestamp(value: number | string): string {
+  const num = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(num)) return 'N/A';
+  const diffMs = Date.now() - num;
+  if (!Number.isFinite(diffMs) || diffMs < 0) return 'just now';
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    const rem = minutes % 60;
+    return rem ? `${hours}h ${rem}m ago` : `${hours}h ago`;
+  }
+  const days = Math.floor(hours / 24);
+  return days === 1 ? '1 day ago' : `${days} days ago`;
+}
 
 function formatGpsLocation(): string {
   if (gpsLatitude.value !== null && gpsLongitude.value !== null) {
@@ -436,9 +582,11 @@ function formatPct(v: number | 'N/A') {
   return 'N/A';
 }
 
-async function fetchInstantProm(query: string): Promise<number | 'N/A'> {
+async function fetchInstantProm(query: string, evalTime?: number): Promise<number | 'N/A'> {
   try {
-    const res = await axios.get(`/api/promql`, { params: { query } });
+    const params: Record<string, any> = { query };
+    if (typeof evalTime === 'number') params.time = evalTime;
+    const res = await axios.get(`/api/promql`, { params });
     const result = res.data?.data?.result;
     if (Array.isArray(result) && result.length > 0) {
       const value = result[0]?.value?.[1];
@@ -453,9 +601,13 @@ async function fetchInstantProm(query: string): Promise<number | 'N/A'> {
 
 async function fetchRangeProm(query: string, seconds = 600, step = 10, fixedEnd?: number): Promise<Array<[number, number]>> {
   try {
-    const end = typeof fixedEnd === 'number' ? fixedEnd : Math.floor(Date.now() / 1000);
-    const start = end - seconds;
-    const res = await axios.get(`/api/promql`, { params: { query, start, end, step } });
+    const secondsSafe = Number.isFinite(seconds) && seconds > 0 ? seconds : 600;
+    const stepSafe = Number.isFinite(step) && step > 0 ? step : 60;
+    const end = (typeof fixedEnd === 'number' && Number.isFinite(fixedEnd))
+      ? fixedEnd
+      : Math.floor((Date.now() - (rangeShiftMinutes.value * 60 * 1000)) / 1000);
+    const start = end - secondsSafe;
+    const res = await axios.get(`/api/promql`, { params: { query, start, end, step: stepSafe } });
     const result = res.data?.data?.result;
     if (!Array.isArray(result) || result.length === 0) return [];
     const values = result[0]?.values as Array<[number, string]> | undefined;
@@ -551,7 +703,7 @@ async function computeRunMb(run: { start: number; end: number }) {
 }
 
 async function enrichVisibleRunsWithMb() {
-  const now = Date.now();
+  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
   const windowStart = now - (rangeSeconds.value * 1000);
   const visible = benchRuns.value.filter(r => r.end >= windowStart && r.start <= now);
   await Promise.all(visible.map(async (r) => {
@@ -597,7 +749,7 @@ async function loadBenchRuns() {
         timeZone: 'America/Los_Angeles', year: '2-digit', month: '2-digit', day: '2-digit',
         hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
       });
-      const now = Date.now();
+      const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
       const startWindow = now - (rangeSeconds.value * 1000);
       const startPT = fmt.format(new Date(startWindow));
       const endPT = fmt.format(new Date(now));
@@ -635,6 +787,13 @@ async function refreshAll() {
     console.error('❌ Could not fetch benchmark runs:', e);
   }
 
+  const nowMs = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
+  const fixedEnd = Math.floor(nowMs / 1000);
+  const secondsRaw = Number(rangeSeconds.value);
+  const seconds = Number.isFinite(secondsRaw) && secondsRaw > 0 ? secondsRaw : 3600;
+  const stepRaw = Math.floor(seconds / 60);
+  const step = Number.isFinite(stepRaw) && stepRaw > 0 ? Math.max(10, stepRaw) : 60;
+
   const q = {
     latency: 'starlink_latency_ms',
     packetLoss: 'starlink_packet_loss_pct',
@@ -643,10 +802,10 @@ async function refreshAll() {
   } as const;
 
   const [lat, pl, dMbps, uMbps] = await Promise.all([
-    fetchInstantProm(q.latency),
-    fetchInstantProm(q.packetLoss),
-    fetchInstantProm(q.bandwidthDown),
-    fetchInstantProm(q.bandwidthUp)
+    fetchInstantProm(q.latency, fixedEnd),
+    fetchInstantProm(q.packetLoss, fixedEnd),
+    fetchInstantProm(q.bandwidthDown, fixedEnd),
+    fetchInstantProm(q.bandwidthUp, fixedEnd)
   ]);
   metrics.value.latency = lat;
   metrics.value.packetLoss = pl;
@@ -654,38 +813,40 @@ async function refreshAll() {
   metrics.value.bandwidthUp = uMbps;
 
   // Total download (GB) over last hour; assumes 15s scrape interval
-  const totalGb = await fetchInstantProm('sum_over_time(starlink_down_mbps[1h]) * 15 / 8000');
+  const totalGb = await fetchInstantProm('sum_over_time(starlink_down_mbps[1h]) * 15 / 8000', fixedEnd);
   totalDownGb.value = typeof totalGb === 'number' && Number.isFinite(totalGb) ? totalGb : 'N/A';
 
   // WiFi link speed (Mbps): windows_wifi_link_speed_mbps - connection speed between computer and Starlink router
-  const wifi = await fetchInstantProm('windows_wifi_link_speed_mbps');
+  const wifi = await fetchInstantProm('windows_wifi_link_speed_mbps', fixedEnd);
   nicSpeedMbps.value = typeof wifi === 'number' && Number.isFinite(wifi) ? wifi : 'N/A';
 
   // GPS location
   const [gpsLat, gpsLon] = await Promise.all([
-    fetchInstantProm('starlink_dish_gps_latitude'),
-    fetchInstantProm('starlink_dish_gps_longitude')
+    fetchInstantProm('starlink_dish_gps_latitude', fixedEnd),
+    fetchInstantProm('starlink_dish_gps_longitude', fixedEnd)
   ]);
   gpsLatitude.value = typeof gpsLat === 'number' && Number.isFinite(gpsLat) ? gpsLat : null;
   gpsLongitude.value = typeof gpsLon === 'number' && Number.isFinite(gpsLon) ? gpsLon : null;
 
-  const fixedEnd = Math.floor(Date.now() / 1000);
-  const seconds = rangeSeconds.value;
-  const step = Math.max(10, Math.floor(seconds / 60));
   latencySeries.value = await fetchRangeProm(q.latency, seconds, step, fixedEnd);
   packetLossSeries.value = await fetchRangeProm(q.packetLoss, seconds, step, fixedEnd);
-  const [down, up, ml, downMBm, upMBm, downMB10, upMB10] = await Promise.all([
+  const [down, up, ml, downMBm, upMBm, downMB10, upMB10, speedDownRange, speedUpRange] = await Promise.all([
     fetchRangeProm(q.bandwidthDown, seconds, step, fixedEnd),
     fetchRangeProm(q.bandwidthUp, seconds, step, fixedEnd),
-    fetchRangeProm('starlink_micro_loss * 100', seconds, step, fixedEnd),
+    fetchRangeProm('starlink_micro_loss', seconds, step, fixedEnd),
     fetchRangeProm('avg_over_time(starlink_dish_downlink_throughput_bytes[1m]) * 60 / 1e6', seconds, step, fixedEnd),
     fetchRangeProm('avg_over_time(starlink_dish_uplink_throughput_bytes[1m]) * 60 / 1e6', seconds, step, fixedEnd),
     fetchRangeProm('sum_over_time(starlink_dish_downlink_throughput_bytes[10m]) / 1e6', seconds, step, fixedEnd),
-    fetchRangeProm('sum_over_time(starlink_dish_uplink_throughput_bytes[10m]) / 1e6', seconds, step, fixedEnd)
+    fetchRangeProm('sum_over_time(starlink_dish_uplink_throughput_bytes[10m]) / 1e6', seconds, step, fixedEnd),
+    fetchRangeProm('starlink_speedtest_download_mbps', seconds, step, fixedEnd),
+    fetchRangeProm('starlink_speedtest_upload_mbps', seconds, step, fixedEnd)
   ]);
   bandwidthDownSeries.value = down;
   bandwidthUpSeries.value = up;
   microLossSeries.value = ml;
+  speedtestDownSeries.value = speedDownRange;
+  speedtestUpSeries.value = speedUpRange;
+
   // Clamp MB/min and MB/10m to reduce unrealistic spikes from transient exporter outliers
   // Hard cap: Starlink max theoretical is ~300 Mbps = ~37.5 MB/s = ~2250 MB/min, so cap at 3000 MB/min for safety
   // Use 95th percentile (more aggressive) with 1.3x factor to catch outliers
@@ -718,10 +879,10 @@ async function refreshAll() {
 
   // Flags
   const [spike, microLoss, outage, obstruction] = await Promise.all([
-    fetchInstantProm('starlink_latency_spike'),
-    fetchInstantProm('starlink_micro_loss'),
-    fetchInstantProm('starlink_outage_active'),
-    fetchInstantProm('starlink_obstruction_present')
+    fetchInstantProm('starlink_latency_spike', fixedEnd),
+    fetchInstantProm('starlink_micro_loss', fixedEnd),
+    fetchInstantProm('starlink_outage_active', fixedEnd),
+    fetchInstantProm('starlink_obstruction_present', fixedEnd)
   ]);
   flags.value.latencySpike = spike === 'N/A' ? false : Number(spike) > 0;
   flags.value.microLoss = microLoss === 'N/A' ? false : Number(microLoss) > 0;
@@ -746,28 +907,6 @@ async function refreshAll() {
 
   // Starlink Events: detect state changes and obstructions
   await loadStarlinkEvents(seconds, 30, fixedEnd);
-
-  if (teSettings.value.enabled) {
-    try {
-      const [speedDown, speedUp, speedLatency] = await Promise.all([
-        fetchRangeProm('thousandeyes_speedtest_down_mbps', seconds, step, fixedEnd),
-        fetchRangeProm('thousandeyes_speedtest_up_mbps', seconds, step, fixedEnd),
-        fetchRangeProm('thousandeyes_speedtest_latency_ms', seconds, step, fixedEnd)
-      ]);
-      speedtestDownSeries.value = speedDown;
-      speedtestUpSeries.value = speedUp;
-      speedtestLatencySeries.value = speedLatency;
-    } catch (error) {
-      console.error('Failed to load ThousandEyes speedtest metrics:', error);
-      speedtestDownSeries.value = [];
-      speedtestUpSeries.value = [];
-      speedtestLatencySeries.value = [];
-    }
-  } else {
-    speedtestDownSeries.value = [];
-    speedtestUpSeries.value = [];
-    speedtestLatencySeries.value = [];
-  }
 }
 
 async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: number) {
@@ -1013,14 +1152,11 @@ const downMbPerMinSeries = ref<Array<[number, number]>>([]);
 const upMbPerMinSeries = ref<Array<[number, number]>>([]);
 const downMbPer10MinSeries = ref<Array<[number, number]>>([]);
 const upMbPer10MinSeries = ref<Array<[number, number]>>([]);
+const speedtestDownSeries = ref<Array<[number, number]>>([]);
+const speedtestUpSeries = ref<Array<[number, number]>>([]);
 const benchRuns = ref<Array<{ task: string; start: number; end: number }>>([]);
 const anomalySeries = ref<Array<[number, number]>>([]);
 const starlinkEvents = ref<Array<{ time: string; timestamp: number; message: string; icon: string; color: string }>>([]);
-
-// ThousandEyes speedtest series
-const speedtestDownSeries = ref<Array<[number, number]>>([]);
-const speedtestUpSeries = ref<Array<[number, number]>>([]);
-const speedtestLatencySeries = ref<Array<[number, number]>>([]);
 
 // Diagnostic charts series
 const snrSeries = ref<Array<[number, number]>>([]);
@@ -1035,10 +1171,120 @@ const firstSlotSeries = ref<Array<[number, number]>>([]);
 const hasLatencyData = computed(() => latencySeries.value.length > 0 || packetLossSeries.value.length > 0);
 const hasBandwidthData = computed(() => bandwidthDownSeries.value.length > 0 || bandwidthUpSeries.value.length > 0 || microLossSeries.value.length > 0 || downMbPerMinSeries.value.length > 0 || upMbPerMinSeries.value.length > 0 || downMbPer10MinSeries.value.length > 0 || upMbPer10MinSeries.value.length > 0);
 const hasAnomalyData = computed(() => anomalySeries.value.length > 0);
-const hasSpeedtestData = computed(() => speedtestDownSeries.value.length > 0 || speedtestUpSeries.value.length > 0 || speedtestLatencySeries.value.length > 0);
+const hasSpeedtestData = computed(() => speedtestDownSeries.value.length > 0 || speedtestUpSeries.value.length > 0);
+const hasFallbackSpeedData = computed(() => bandwidthDownSeries.value.length > 0 || bandwidthUpSeries.value.length > 0);
+const syntheticLastSuccess = computed<number | null>(() => {
+  const raw = metrics.value.speedtestUpdated;
+  const num = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(num) && num > 0 ? num : null;
+});
+const syntheticIsFresh = computed(() => {
+  const ts = syntheticLastSuccess.value;
+  if (!ts) return false;
+  const ageMinutes = (Date.now() - ts) / 60000;
+  const cadence = Math.max(speedtestSettings.value.intervalMinutes || 0, 5);
+  const allowable = Math.max(cadence * 2, 30); // permit up to twice cadence or 30 minutes whichever larger
+  return ageMinutes <= allowable;
+});
+const syntheticDownInstant = computed(() => {
+  const raw = metrics.value.speedtestDown;
+  const num = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(num) && num > 0 ? num : null;
+});
+const syntheticUpInstant = computed(() => {
+  const raw = metrics.value.speedtestUp;
+  const num = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(num) && num > 0 ? num : null;
+});
+const showSyntheticSpeedtest = computed(() => (
+  speedtestDownSeries.value.length > 0 &&
+  speedtestUpSeries.value.length > 0 &&
+  syntheticIsFresh.value &&
+  syntheticDownInstant.value !== null &&
+  syntheticUpInstant.value !== null
+));
+const anyDiagnosticsVisible = computed(() => Object.values(diagnosticVisibility).some(Boolean));
+const speedtestServerLabel = computed(() => {
+  const match = speedtestServerOptions.find((opt) => opt.value === speedtestSettings.value.server);
+  return match ? match.label : speedtestSettings.value.server;
+});
+const speedtestCadenceLabel = computed(() => {
+  const minutes = speedtestSettings.value.intervalMinutes;
+  if (!Number.isFinite(minutes) || minutes <= 0) return 'N/A';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const rem = minutes % 60;
+  return rem ? `${hours}h ${rem}m` : `${hours}h`;
+});
+
+const latestFromSeries = (series: Array<[number, number]>) => {
+  if (!Array.isArray(series) || series.length === 0) return null;
+  const [, value] = series[series.length - 1];
+  return Number.isFinite(value) ? value : null;
+};
+
+const displayDownloadMbps = computed<number | null>(() => {
+  if (showSyntheticSpeedtest.value && syntheticDownInstant.value !== null) return syntheticDownInstant.value;
+  const fallback = latestFromSeries(bandwidthDownSeries.value);
+  return fallback !== null ? fallback : null;
+});
+
+const displayUploadMbps = computed<number | null>(() => {
+  if (showSyntheticSpeedtest.value && syntheticUpInstant.value !== null) return syntheticUpInstant.value;
+  const fallback = latestFromSeries(bandwidthUpSeries.value);
+  return fallback !== null ? fallback : null;
+});
+
+const latencySeriesProcessed = computed(() => {
+  const original = latencySeries.value;
+  if (!Array.isArray(original) || original.length === 0) {
+    return { points: [] as Array<[number, number | null]>, gaps: [] as Array<[number, number]> };
+  }
+
+  const diffs: number[] = [];
+  for (let i = 0; i < original.length - 1; i += 1) {
+    const diff = original[i + 1][0] - original[i][0];
+    if (Number.isFinite(diff) && diff > 0) {
+      diffs.push(diff);
+    }
+  }
+
+  diffs.sort((a, b) => a - b);
+  const medianIdx = diffs.length > 0 ? Math.floor(diffs.length / 2) : 0;
+  const typicalStepMs = diffs.length > 0 ? diffs[medianIdx] : 10_000;
+  const gapThreshold = Math.max(typicalStepMs * 2.5, 30_000);
+
+  const processed: Array<[number, number | null]> = [[original[0][0], original[0][1]]];
+  const gaps: Array<[number, number]> = [];
+
+  for (let i = 0; i < original.length - 1; i += 1) {
+    const current = original[i];
+    const next = original[i + 1];
+    const diff = next[0] - current[0];
+
+    if (diff > gapThreshold) {
+      const padding = Math.min(typicalStepMs, diff / 4);
+      const gapStart = current[0] + padding;
+      const gapEnd = next[0] - padding;
+      if (gapEnd > gapStart) {
+        gaps.push([gapStart, gapEnd]);
+        processed.push([gapStart, null]);
+        processed.push([gapEnd, null]);
+      } else {
+        gaps.push([current[0], next[0]]);
+        processed.push([current[0] + 1, null]);
+        processed.push([next[0] - 1, null]);
+      }
+    }
+
+    processed.push([next[0], next[1]]);
+  }
+
+  return { points: processed, gaps };
+});
 
 const latencyOption = computed(() => {
-  const now = Date.now();
+  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
   const windowStart = now - (rangeSeconds.value * 1000);
   const markLineData: any[] = benchRuns.value
     .filter(run => run.end >= windowStart && run.start <= now)
@@ -1085,6 +1331,8 @@ const latencyOption = computed(() => {
     benchRuns: benchRuns.value 
   });
 
+  const packetLossRange = computeAxisRange(packetLossSeries.value, 0.25, { min: 0, max: 5 }, { includeZero: true, minSpan: 0.2 });
+
   return {
     tooltip: { trigger: 'axis', valueFormatter: formatTooltipValue },
     grid: { left: 40, right: 80, top: 64, bottom: 40 },
@@ -1100,17 +1348,26 @@ const latencyOption = computed(() => {
   },
     yAxis: [
       { type: 'value', name: 'ms' },
-      { type: 'value', name: '%', position: 'right' }
+      { type: 'value', name: '%', position: 'right', min: packetLossRange.min, max: packetLossRange.max }
     ],
     series: [
       { 
         type: 'line', 
         name: 'Latency', 
-        data: latencySeries.value, 
+        data: latencySeriesProcessed.value.points, 
         showSymbol: false, 
         smooth: true, 
+        connectNulls: false,
         lineStyle: { width: 2 }, 
-        yAxisIndex: 0
+        yAxisIndex: 0,
+        markArea: latencySeriesProcessed.value.gaps.length > 0 ? {
+          silent: true,
+          itemStyle: { color: 'rgba(220, 53, 69, 0.18)' },
+          data: latencySeriesProcessed.value.gaps.map(([start, end]) => ([
+            { xAxis: start },
+            { xAxis: end }
+          ]))
+        } : undefined
       },
       { type: 'line', name: 'Packet Loss (%)', data: packetLossSeries?.value || [], showSymbol: false, lineStyle: { width: 2, type: 'dashed' }, yAxisIndex: 1 },
       // Invisible series to force markLine rendering
@@ -1138,7 +1395,7 @@ const latencyOption = computed(() => {
 });
 
 const bandwidthOption = computed(() => {
-  const now = Date.now();
+  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
   const windowStart = now - (rangeSeconds.value * 1000);
   const markLineData: any[] = benchRuns.value
     .filter(run => run.end >= windowStart && run.start <= now)
@@ -1173,7 +1430,7 @@ const bandwidthOption = computed(() => {
     });
 
   // Restore legend selection from localStorage
-  const storedLegend = localStorage.getItem('starlink_bandwidthLegend');
+  const storedLegend = isBrowser ? window.localStorage.getItem('starlink_bandwidthLegend') : null;
   const legendSelected = storedLegend ? JSON.parse(storedLegend) : undefined;
 
   return ({
@@ -1183,12 +1440,12 @@ const bandwidthOption = computed(() => {
       valueFormatter: formatTooltipValue
     },
     grid: { left: 60, right: 100, top: 64, bottom: 40 },
-    legend: { 
-      top: 6, 
-      data: ['Down (Mbps)', 'Up (Mbps)', 'Down (MB/min)', 'Up (MB/min)', 'Down (MB/10m)', 'Up (MB/10m)', 'Micro-loss (%/10)'],
+    legend: {
+      top: 6,
+      data: ['Down (Mbps)', 'Up (Mbps)', 'Down (MB/min)', 'Up (MB/min)', 'Down (MB/10m)', 'Up (MB/10m)', 'Micro-loss (%)'],
       selected: legendSelected
     },
-    xAxis: { 
+    xAxis: {
       type: 'time',
       axisLabel: {
         formatter: (value: number) => new Intl.DateTimeFormat('en-US', {
@@ -1200,16 +1457,19 @@ const bandwidthOption = computed(() => {
     yAxis: [
       { type: 'value', name: 'Mbps' },
       { type: 'value', name: 'MB/min', position: 'right', offset: 0 },
-      { type: 'value', name: '%', position: 'right', offset: 48 }
+      (() => {
+        const microLossRange = computeAxisRange(microLossSeries.value, 0.25, { min: 0, max: 100 }, { includeZero: true, minSpan: 5 });
+        return { type: 'value', name: '%', position: 'right', offset: 48, min: microLossRange.min, max: microLossRange.max };
+      })()
     ],
     series: [
-      { 
-        type: 'line', 
-        name: 'Down (Mbps)', 
-        data: bandwidthDownSeries.value, 
-        showSymbol: false, 
-        smooth: true, 
-        yAxisIndex: 0, 
+      {
+        type: 'line',
+        name: 'Down (Mbps)',
+        data: bandwidthDownSeries.value,
+        showSymbol: false,
+        smooth: true,
+        yAxisIndex: 0,
         lineStyle: { width: 2 }
       },
       { type: 'line', name: 'Up (Mbps)', data: bandwidthUpSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 2 } },
@@ -1217,7 +1477,7 @@ const bandwidthOption = computed(() => {
       { type: 'line', name: 'Up (MB/min)', data: upMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 1, lineStyle: { width: 1.5, type: 'dotted' } },
       { type: 'line', name: 'Down (MB/10m)', data: downMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 1, lineStyle: { width: 1.5 } },
       { type: 'line', name: 'Up (MB/10m)', data: upMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 1, lineStyle: { width: 1.5 } },
-      { type: 'line', name: 'Micro-loss (%/10)', data: microLossSeries.value, showSymbol: false, yAxisIndex: 2, lineStyle: { type: 'dashed', width: 2 } },
+      { type: 'line', name: 'Micro-loss (%)', data: microLossSeries.value, showSymbol: false, yAxisIndex: 2, lineStyle: { type: 'dashed', width: 2 } },
       // Invisible series to force markLine rendering (always present)
       {
         type: 'line', name: 'Benchmarks', data: [], showSymbol: false, xAxisIndex: 0, yAxisIndex: 0,
@@ -1249,190 +1509,110 @@ const anomalyOption = computed(() => {
     xAxis: event.timestamp,
     lineStyle: { color: event.color, width: 2, type: 'dashed' },
     icon: event.icon,
-    label: { 
-      show: true, 
+    label: {
+      show: true,
       formatter: (p: any) => {
         const ts = typeof p?.data?.xAxis === 'number' ? p.data.xAxis : undefined;
         const time = typeof ts === 'number' ? new Intl.DateTimeFormat('en-US', {
           timeZone: 'America/Los_Angeles',
           hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
         }).format(new Date(ts)) : '';
-        const icon = p?.data?.icon || '';
-        return time ? `${icon} ${time}` : icon;
+        return `${event.icon} ${time}`;
       },
-      fontSize: 14,
-      color: event.color
+      fontSize: 10
     }
   }));
-  
-  if (eventMarkLines.length > 0) {
-    const now = Date.now();
-    const windowStart = now - (rangeSeconds.value * 1000);
-    console.log(`📍 Creating ${eventMarkLines.length} mark lines for Anomaly chart:`, eventMarkLines.map(m => {
-      // More inclusive boundary check - allow events within 2 minutes of window edges
-      const inWindow = m.xAxis > (windowStart - 120000) && m.xAxis < (now + 120000);
-      return { 
-        time: new Intl.DateTimeFormat('en-US', { 
-          timeZone: 'America/Los_Angeles', 
-          month: 'short', day: 'numeric', 
-          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
-        }).format(new Date(m.xAxis)),
-        msg: m.name,
-        inWindow: inWindow ? '✅' : '❌'
-      };
-    }));
-    console.log(`📍 Current window: ${new Intl.DateTimeFormat('en-US', { 
-      timeZone: 'America/Los_Angeles', 
-      month: 'short', day: 'numeric', 
-      hour: '2-digit', minute: '2-digit', hour12: false 
-    }).format(new Date(windowStart))} to ${new Intl.DateTimeFormat('en-US', { 
-      timeZone: 'America/Los_Angeles', 
-      month: 'short', day: 'numeric', 
-      hour: '2-digit', minute: '2-digit', hour12: false 
-    }).format(new Date(now))}`);
-  }
 
   return {
-    tooltip: { trigger: 'item', valueFormatter: formatTooltipValue },
-    grid: { left: 40, right: 40, top: 40, bottom: 40 },
-    legend: { top: 6, data: ['Anomaly Rate (%)'] },
-    xAxis: { 
-      type: 'time',
-      axisLabel: {
-        formatter: (value: number) => new Intl.DateTimeFormat('en-US', {
-          timeZone: 'America/Los_Angeles',
-          hour: '2-digit', minute: '2-digit', hour12: false
-        }).format(new Date(value))
-      }
-    },
-    yAxis: [
-      { 
-        type: 'value', 
-        name: '%', 
-        min: 0, 
-        max: 100,
-        axisLabel: { 
-          formatter: '{value}'
-        }
-      },
-      // Dummy y-axes to match bandwidth chart structure for alignment
-      { type: 'value', show: false, position: 'right', offset: 0 },
-      { type: 'value', show: false, position: 'right', offset: 48 }
-    ],
+    tooltip: { trigger: 'axis', valueFormatter: formatTooltipValue },
+    grid: { left: 40, right: 80, top: 48, bottom: 24 },
+    legend: { top: 4, data: ['Anomaly Rate (%)'] },
+    xAxis: { type: 'time' },
+    yAxis: { type: 'value', name: '%', min: 0, max: 100 },
     series: [
-      { 
-        type: 'line', 
-        name: 'Anomaly Rate (%)', 
-        data: anomalySeries.value, 
-        showSymbol: false, 
-        smooth: true, 
-        tooltip: { show: false },
-        lineStyle: { width: 2, color: '#ff6b6b' },
-        areaStyle: { color: 'rgba(255, 107, 107, 0.1)' },
-        markLine: eventMarkLines.length > 0 ? {
-          symbol: ['none', 'none'],
-          data: eventMarkLines,
-          label: { show: true, fontSize: 14 },
-          tooltip: { 
-            show: true, 
-            formatter: (p: any) => {
-              const name = p?.data?.name || p?.name || '';
-              const ts = typeof p?.data?.xAxis === 'number' ? p.data.xAxis : undefined;
-              const time = typeof ts === 'number' ? new Intl.DateTimeFormat('en-US', {
-                timeZone: 'America/Los_Angeles',
-                month: 'short', day: 'numeric',
-                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-              }).format(new Date(ts)) : '';
-              return time ? `${name}\n${time}` : name;
-            }
-          }
-        } : undefined
-      }
-    ]
+      { type: 'line', name: 'Anomaly Rate (%)', data: anomalySeries.value, showSymbol: false, lineStyle: { width: 1.5 } }
+    ],
+    markLine: eventMarkLines.length > 0 ? {
+      data: eventMarkLines.map(line => [{ xAxis: line.xAxis, lineStyle: line.lineStyle, label: line.label, name: line.name }]),
+      symbol: ['none', 'none']
+    } : undefined
   };
 });
 
 const speedtestOption = computed(() => {
+  const downRange = computeAxisRange(speedtestDownSeries.value, 0.1, { min: 0, max: 200 }, { includeZero: true, minSpan: 1 });
+  const upRange = computeAxisRange(speedtestUpSeries.value, 0.1, { min: 0, max: 200 }, { includeZero: true, minSpan: 1 });
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
-    grid: { left: 50, right: 70, top: 54, bottom: 40 },
-    legend: { top: 6, data: ['Download (Mbps)', 'Upload (Mbps)', 'Latency (ms)'] },
-    xAxis: {
-      type: 'time',
-      axisLabel: {
-        formatter: (value: number) => new Intl.DateTimeFormat('en-US', {
-          timeZone: 'America/Los_Angeles',
-          hour: '2-digit', minute: '2-digit', hour12: false
-        }).format(new Date(value))
-      }
-    },
+    grid: { left: 45, right: 70, top: 32, bottom: 28 },
+    legend: { top: 4, data: ['Download (Mbps)', 'Upload (Mbps)'] },
+    xAxis: { type: 'time' },
     yAxis: [
-      { type: 'value', name: 'Mbps' },
-      { type: 'value', name: 'ms', position: 'right' }
+      { type: 'value', name: 'Download (Mbps)', min: downRange.min, max: downRange.max },
+      { type: 'value', name: 'Upload (Mbps)', position: 'right', min: upRange.min, max: upRange.max }
     ],
     series: [
-      {
-        type: 'line',
-        name: 'Download (Mbps)',
-        data: speedtestDownSeries.value,
-        smooth: true,
-        showSymbol: false,
-        lineStyle: { width: 2, color: '#1a73e8' }
-      },
-      {
-        type: 'line',
-        name: 'Upload (Mbps)',
-        data: speedtestUpSeries.value,
-        smooth: true,
-        showSymbol: false,
-        lineStyle: { width: 2, color: '#34a853' }
-      },
-      {
-        type: 'line',
-        name: 'Latency (ms)',
-        data: speedtestLatencySeries.value,
-        smooth: true,
-        showSymbol: false,
-        lineStyle: { width: 1.5, type: 'dashed', color: '#8e24aa' },
-        yAxisIndex: 1
-      }
+      { type: 'line', name: 'Download (Mbps)', data: speedtestDownSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 1.8, color: '#1a73e8' } },
+      { type: 'line', name: 'Upload (Mbps)', data: speedtestUpSeries.value, showSymbol: false, smooth: true, yAxisIndex: 1, lineStyle: { width: 1.8, color: '#34a853' } }
+    ]
+  };
+});
+
+const speedtestFallbackOption = computed(() => {
+  const downRange = computeAxisRange(bandwidthDownSeries.value, 0.15, { min: 0, max: 100 }, { includeZero: true, minSpan: 0.5 });
+  const upRange = computeAxisRange(bandwidthUpSeries.value, 0.15, { min: 0, max: 100 }, { includeZero: true, minSpan: 0.5 });
+  return {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
+    grid: { left: 45, right: 70, top: 32, bottom: 28 },
+    legend: { top: 4, data: ['Starlink Down (Mbps)', 'Starlink Up (Mbps)'] },
+    xAxis: { type: 'time' },
+    yAxis: [
+      { type: 'value', name: 'Down (Mbps)', min: downRange.min, max: downRange.max },
+      { type: 'value', name: 'Up (Mbps)', position: 'right', min: upRange.min, max: upRange.max }
+    ],
+    series: [
+      { type: 'line', name: 'Starlink Down (Mbps)', data: bandwidthDownSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 1.8, color: '#1a73e8' } },
+      { type: 'line', name: 'Starlink Up (Mbps)', data: bandwidthUpSeries.value, showSymbol: false, smooth: true, yAxisIndex: 1, lineStyle: { width: 1.8, color: '#34a853' } }
     ]
   };
 });
 
 // Diagnostic chart options
 const snrOption = computed(() => {
-  const now = Date.now();
+  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
   const windowStart = now - (rangeSeconds.value * 1000);
+  const data = snrSeries.value.filter(([t]) => t >= windowStart);
+  const range = computeAxisRange(data, 0.1, { min: 0, max: 20 }, { includeZero: false, minSpan: 0.001 });
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
-    yAxis: { type: 'value', name: 'dB', min: 0 },
+    yAxis: { type: 'value', name: 'dB', min: range.min, max: range.max, scale: true },
     series: [{
       type: 'line',
       name: 'SNR',
-      data: snrSeries.value.filter(([t]) => t >= windowStart),
+      data,
       showSymbol: false,
       smooth: true,
-      lineStyle: { width: 1.5, color: '#4a90e2' },
-      areaStyle: { color: 'rgba(74, 144, 226, 0.1)' }
+      lineStyle: { width: 1.5, color: '#00897b' }
     }]
   };
 });
 
 const dishStateOption = computed(() => {
-  const now = Date.now();
+  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
   const windowStart = now - (rangeSeconds.value * 1000);
+  const data = dishStateSeries.value.filter(([t]) => t >= windowStart);
+  const range = computeAxisRange(data, 0.1, { min: 0, max: 3 }, { includeZero: true, minSpan: 0.1 });
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
-    yAxis: { type: 'value', name: 'State', min: 0, max: 3 },
+    yAxis: { type: 'value', name: 'State', min: range.min, max: range.max, scale: true },
     series: [{
       type: 'line',
       name: 'State',
-      data: dishStateSeries.value.filter(([t]) => t >= windowStart),
+      data,
       showSymbol: false,
       smooth: true,
       lineStyle: { width: 1.5, color: '#50c878' },
@@ -1442,17 +1622,19 @@ const dishStateOption = computed(() => {
 });
 
 const backupBeamOption = computed(() => {
-  const now = Date.now();
+  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
   const windowStart = now - (rangeSeconds.value * 1000);
+  const data = backupBeamSeries.value.filter(([t]) => t >= windowStart);
+  const range = computeAxisRange(data, 0.1, { min: 0, max: 1 }, { includeZero: true, minSpan: 0.05 });
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
-    yAxis: { type: 'value', name: 'Backup', min: 0, max: 1 },
+    yAxis: { type: 'value', name: 'Backup', min: range.min, max: range.max, scale: true },
     series: [{
       type: 'line',
       name: 'Backup Beam',
-      data: backupBeamSeries.value.filter(([t]) => t >= windowStart),
+      data,
       showSymbol: false,
       smooth: true,
       lineStyle: { width: 1.5, color: '#ff9500' },
@@ -1462,17 +1644,19 @@ const backupBeamOption = computed(() => {
 });
 
 const slotEndOption = computed(() => {
-  const now = Date.now();
+  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
   const windowStart = now - (rangeSeconds.value * 1000);
+  const data = slotEndSeries.value.filter(([t]) => t >= windowStart);
+  const range = computeAxisRange(data, 0.1, { min: 0, max: 10 }, { includeZero: true, minSpan: 0.1 });
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
-    yAxis: { type: 'value', name: 's' },
+    yAxis: { type: 'value', name: 's', min: range.min, max: range.max, scale: true },
     series: [{
       type: 'line',
       name: 'Slot End',
-      data: slotEndSeries.value.filter(([t]) => t >= windowStart),
+      data,
       showSymbol: false,
       smooth: true,
       lineStyle: { width: 1.5, color: '#9b59b6' },
@@ -1482,17 +1666,19 @@ const slotEndOption = computed(() => {
 });
 
 const azimuthOption = computed(() => {
-  const now = Date.now();
+  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
   const windowStart = now - (rangeSeconds.value * 1000);
+  const data = azimuthSeries.value.filter(([t]) => t >= windowStart);
+  const range = computeAxisRange(data, 0.05, { min: 0, max: 360 }, { includeZero: false, minSpan: 0.05 });
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
-    yAxis: { type: 'value', name: 'deg' },
+    yAxis: { type: 'value', name: 'deg', min: range.min, max: range.max, scale: true },
     series: [{
       type: 'line',
       name: 'Azimuth',
-      data: azimuthSeries.value.filter(([t]) => t >= windowStart),
+      data,
       showSymbol: false,
       smooth: true,
       lineStyle: { width: 1.5, color: '#e74c3c' },
@@ -1502,17 +1688,19 @@ const azimuthOption = computed(() => {
 });
 
 const elevationOption = computed(() => {
-  const now = Date.now();
+  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
   const windowStart = now - (rangeSeconds.value * 1000);
+  const data = elevationSeries.value.filter(([t]) => t >= windowStart);
+  const range = computeAxisRange(data, 0.05, { min: 0, max: 90 }, { includeZero: false, minSpan: 0.05 });
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
-    yAxis: { type: 'value', name: 'deg' },
+    yAxis: { type: 'value', name: 'deg', min: range.min, max: range.max, scale: true },
     series: [{
       type: 'line',
       name: 'Elevation',
-      data: elevationSeries.value.filter(([t]) => t >= windowStart),
+      data,
       showSymbol: false,
       smooth: true,
       lineStyle: { width: 1.5, color: '#16a085' },
@@ -1522,17 +1710,19 @@ const elevationOption = computed(() => {
 });
 
 const firstSlotOption = computed(() => {
-  const now = Date.now();
+  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
   const windowStart = now - (rangeSeconds.value * 1000);
+  const data = firstSlotSeries.value.filter(([t]) => t >= windowStart);
+  const range = computeAxisRange(data, 0.1, { min: 0, max: 2 }, { includeZero: true, minSpan: 0.05 });
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
     xAxis: { type: 'time', show: false },
-    yAxis: { type: 'value', name: 's' },
+    yAxis: { type: 'value', name: 's', min: range.min, max: range.max, scale: true },
     series: [{
       type: 'line',
       name: 'First Slot',
-      data: firstSlotSeries.value.filter(([t]) => t >= windowStart),
+      data,
       showSymbol: false,
       smooth: true,
       lineStyle: { width: 1.5, color: '#c0392b' },
@@ -1567,16 +1757,28 @@ function periodicityStyle(detected: boolean) {
 
 function onBandwidthLegendChange(event: any) {
   // Save legend selection state to localStorage
-  if (event && event.selected) {
+  if (isBrowser && event && event.selected) {
     localStorage.setItem('starlink_bandwidthLegend', JSON.stringify(event.selected));
   }
 }
 
 // Watch rangeSeconds and save to localStorage
 watch(rangeSeconds, (newVal) => {
-  if (isBrowser) {
-    localStorage.setItem('starlink_rangeSeconds', String(newVal));
+  if (!isBrowser) return;
+  let next = Number(newVal);
+  if (!Number.isFinite(next) || next <= 0) next = 3600;
+  if (next !== newVal) {
+    rangeSeconds.value = next;
+    return;
   }
+  localStorage.setItem('starlink_rangeSeconds', String(next));
+});
+
+watch(rangeShiftMinutes, (val) => {
+  if (isBrowser && Number.isFinite(val)) {
+    localStorage.setItem('starlink_range_shift_minutes', String(val));
+  }
+  refreshAll();
 });
 
 watch(baselineDownMbps, (val) => {
@@ -1591,22 +1793,34 @@ watch(baselineUpMbps, (val) => {
   }
 });
 
-watch(teSettings, (val) => {
-  if (!isBrowser) return;
-  try {
-    localStorage.setItem('starlink_te_settings', JSON.stringify(val));
-  } catch {}
-}, { deep: true });
-
-watch(() => teSettings.value.enabled, (enabled) => {
-  if (enabled) {
-    refreshAll();
-  } else {
-    speedtestDownSeries.value = [];
-    speedtestUpSeries.value = [];
-    speedtestLatencySeries.value = [];
+watch(loggingIntervalSeconds, (val) => {
+  if (isBrowser && typeof val === 'number' && Number.isFinite(val) && val > 0) {
+    localStorage.setItem('starlink_logging_interval_seconds', String(val));
   }
 });
+
+watch(() => speedtestSettings.value.server, (val) => {
+  if (!isBrowser) return;
+  localStorage.setItem('starlink_speedtest_server', val);
+  refreshAll();
+});
+
+watch(() => speedtestSettings.value.intervalMinutes, (val) => {
+  if (!isBrowser) return;
+  let next = val;
+  if (!Number.isFinite(next) || next <= 0) next = 15;
+  if (next < 5) next = 5;
+  if (next !== val) {
+    speedtestSettings.value.intervalMinutes = next;
+    return;
+  }
+  localStorage.setItem('starlink_speedtest_interval_minutes', String(next));
+});
+
+watch(diagnosticVisibility, (val) => {
+  if (!isBrowser) return;
+  localStorage.setItem('starlink_diagnostics_visibility', JSON.stringify(val));
+}, { deep: true });
 
 onMounted(() => {
   refreshAll();
@@ -1614,6 +1828,11 @@ onMounted(() => {
   // Refresh benchmark overlays every 60s without reloading full series
   setInterval(() => { loadBenchRuns(); }, 60000);
 });
+
+if (isBrowser) {
+  // Clean up legacy ThousandEyes settings persisted before the integration was removed.
+  localStorage.removeItem('starlink_te_settings');
+}
 </script>
 
 <script lang="ts">

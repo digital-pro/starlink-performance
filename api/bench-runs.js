@@ -1,58 +1,89 @@
-import { get, list } from '@vercel/blob';
+import { list } from '@vercel/blob';
 
 if (!process.env.BLOB_READ_WRITE_TOKEN && process.env.PERFORMANCE_READ_WRITE_TOKEN) {
   process.env.BLOB_READ_WRITE_TOKEN = process.env.PERFORMANCE_READ_WRITE_TOKEN;
 }
 
-async function readBlobJson(pathname) {
+const PUBLIC_BASE_URL = (process.env.BLOB_PUBLIC_BASE_URL || '').replace(/\/$/, '');
+
+async function fetchJson(url) {
+  if (!url) return null;
   try {
-    const result = await get(pathname, { download: true });
-    const text = await result?.blob?.text();
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const text = await res.text();
     return text ? JSON.parse(text) : null;
   } catch {
     return null;
   }
 }
 
+function sortByUploadedAtDesc(blobs = []) {
+  return [...blobs].sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0));
+}
+
 async function readFromBlob() {
   try {
-    const preferExact = ['benchmarks/runs.json', 'benchmarks/latest.json'];
-    for (const key of preferExact) {
-      const data = await readBlobJson(key);
-      if (Array.isArray(data?.runs)) return data.runs;
-      if (Array.isArray(data)) return data;
-    }
-
     const collected = await list({ prefix: 'benchmarks/' });
     const blobs = collected?.blobs ?? [];
     if (blobs.length === 0) return [];
 
-    const runsCandidate = blobs.find(b => b.pathname.startsWith('benchmarks/runs'));
-    if (runsCandidate) {
-      const data = await readBlobJson(runsCandidate.pathname);
+    const grouped = new Map();
+    for (const blob of blobs) {
+      if (!blob?.pathname) continue;
+      const existing = grouped.get(blob.pathname) || [];
+      existing.push(blob);
+      grouped.set(blob.pathname, existing);
+    }
+
+    const preferExact = ['benchmarks/runs.json', 'benchmarks/latest.json'];
+    for (const key of preferExact) {
+      const candidates = grouped.get(key);
+      if (candidates && candidates.length) {
+        for (const blob of sortByUploadedAtDesc(candidates)) {
+          const data = await fetchJson(blob.url);
+          if (Array.isArray(data?.runs)) return data.runs;
+          if (Array.isArray(data)) return data;
+        }
+      }
+    }
+
+    const runsCandidates = blobs.filter(b => b.pathname.startsWith('benchmarks/runs'));
+    for (const blob of sortByUploadedAtDesc(runsCandidates)) {
+      const data = await fetchJson(blob.url);
       if (Array.isArray(data?.runs)) return data.runs;
       if (Array.isArray(data)) return data;
     }
 
-    const latestCandidate = blobs.find(b => b.pathname.startsWith('benchmarks/latest'));
-    if (latestCandidate) {
-      const data = await readBlobJson(latestCandidate.pathname);
+    const latestCandidates = blobs.filter(b => b.pathname.startsWith('benchmarks/latest'));
+    for (const blob of sortByUploadedAtDesc(latestCandidates)) {
+      const data = await fetchJson(blob.url);
       if (Array.isArray(data?.runs)) return data.runs;
       if (Array.isArray(data)) return data;
     }
 
-    const timestamped = blobs
+    const timestamps = blobs
       .filter(b => /benchmarks\/.+\.json$/.test(b.pathname) && !b.pathname.startsWith('benchmarks/runs') && !b.pathname.startsWith('benchmarks/latest'))
       .sort((a, b) => {
         const aTime = parseInt(a.pathname.split('/')[1]?.split('.')[0] || '0', 10);
         const bTime = parseInt(b.pathname.split('/')[1]?.split('.')[0] || '0', 10);
         return bTime - aTime;
       });
-    if (timestamped.length === 0) return [];
+    if (timestamps.length > 0) {
+      const data = await fetchJson(timestamps[0].url);
+      if (Array.isArray(data?.runs)) return data.runs;
+      if (Array.isArray(data)) return data;
+    }
 
-    const latest = await readBlobJson(timestamped[0].pathname);
-    const runs = Array.isArray(latest?.runs) ? latest.runs : (Array.isArray(latest) ? latest : []);
-    return runs;
+    if (PUBLIC_BASE_URL) {
+      for (const key of preferExact) {
+        const data = await fetchJson(`${PUBLIC_BASE_URL}/${key}`);
+        if (Array.isArray(data?.runs)) return data.runs;
+        if (Array.isArray(data)) return data;
+      }
+    }
+
+    return [];
   } catch (e) {
     console.error('Error reading from Vercel Blob:', e);
     return [];
@@ -64,20 +95,19 @@ async function readMergedRecentFromBlob(maxFiles = 100) {
     const collected = await list({ prefix: 'benchmarks/' });
     const blobs = collected?.blobs ?? [];
     const candidates = blobs
-      .map(b => b.pathname)
-      .filter(n => n.endsWith('.json') && !n.startsWith('benchmarks/runs') && !n.startsWith('benchmarks/latest'));
-    if (candidates.length === 0) return [];
-    const sorted = candidates.sort((a, b) => {
-      const aTime = parseInt(a.split('/')[1]?.split('.')[0] || '0', 10);
-      const bTime = parseInt(b.split('/')[1]?.split('.')[0] || '0', 10);
-      return bTime - aTime;
-    }).slice(0, maxFiles);
+      .filter(b => b.pathname.endsWith('.json') && !b.pathname.startsWith('benchmarks/runs') && !b.pathname.startsWith('benchmarks/latest'))
+      .sort((a, b) => {
+        const aTime = parseInt(a.pathname.split('/')[1]?.split('.')[0] || '0', 10);
+        const bTime = parseInt(b.pathname.split('/')[1]?.split('.')[0] || '0', 10);
+        return bTime - aTime;
+      })
+      .slice(0, maxFiles);
 
     const merged = [];
     const seen = new Set();
-    for (const name of sorted) {
+    for (const blob of candidates) {
       try {
-        const json = await readBlobJson(name);
+        const json = await fetchJson(blob.url);
         const runs = Array.isArray(json) ? json : (Array.isArray(json?.runs) ? json.runs : []);
         for (const r of runs) {
           const key = `${r.task || 'run'}:${r.start}:${r.end}`;
@@ -90,6 +120,13 @@ async function readMergedRecentFromBlob(maxFiles = 100) {
     return merged;
   } catch (e) {
     console.error('Error merging recent from Vercel Blob:', e);
+    if (PUBLIC_BASE_URL) {
+      try {
+        const data = await fetchJson(`${PUBLIC_BASE_URL}/benchmarks/runs.json`);
+        const runs = Array.isArray(data?.runs) ? data.runs : (Array.isArray(data) ? data : []);
+        return runs;
+      } catch {}
+    }
     return [];
   }
 }

@@ -108,6 +108,9 @@ scrape_configs:
   - job_name: wifi
     static_configs: [{ targets: ['127.0.0.1:9818'] }]
 
+  - job_name: speedtest
+    static_configs: [{ targets: ['127.0.0.1:9820'] }]
+
 remote_write:
   - url: https://prometheus-prod-36-prod-us-west-0.grafana.net/api/prom/push
     basic_auth:

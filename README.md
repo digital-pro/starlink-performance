@@ -456,42 +456,9 @@ curl -s https://starlink-performance-digitalpros-projects.vercel.app/api/promql?
 ```
 If the PromQL call returns values, Grafana is receiving data and the dashboard will update within the next scrape interval.
 
-### ThousandEyes speedtest integration
+### Speedtest probes (future work)
 
-Use the Settings modal (⚙) to enable the speedtest chart and store metadata for
-your ThousandEyes Endpoint test. To populate the chart you must run the local
-exporter so Prometheus can scrape the results.
-
-1. Create or identify a ThousandEyes Endpoint test that captures throughput.
-   Note the **test ID**, the agent you want to query, and an API token with read
-   access.
-2. Launch the exporter on the helper machine:
-   ```bash
-   TE_USERNAME="you@example.com" \
-   TE_API_TOKEN="xxxx-xxxx" \
-   TE_TEST_ID=123456 \
-   TE_AGENT_ID=987654 \
-   TE_INTERVAL_SECONDS=300 \
-   npm run speedtest:exporter
-   ```
-   By default the exporter polls every 5 minutes, queries
-   `https://api.thousandeyes.com/v7/endpoint-tests/<TEST_ID>/metrics`, and serves
-   Prometheus metrics at `http://127.0.0.1:9819/metrics`. Override the endpoint
-   with `TE_METRICS_URL` or adjust the JSON paths (`TE_PATH_DOWNLOAD`, etc.) if
-   your response structure differs.
-3. Add a scrape job to the Prometheus helper (e.g., `deployment/prom-wsl.yml`):
-   ```yaml
-   - job_name: 'thousandeyes'
-     scrape_interval: 15s
-     static_configs:
-       - targets: ['127.0.0.1:9819']
-   ```
-4. Flip “Enable ThousandEyes integration” in the Settings modal. The cadence
-   field in the UI is informational; the exporter’s poll rate comes from
-   `TE_INTERVAL_SECONDS`.
-
-When the helper starts scraping `thousandeyes_speedtest_*` metrics, the new chart
-in the diagnostics grid will plot download/upload Mbps and latency automatically.
+We removed the ThousandEyes-powered speedtest panel in November 2025. The dashboard no longer queries `thousandeyes_speedtest_*` metrics, and the exporter script/Prometheus job were dropped. We plan to evaluate a lightweight alternative (e.g., iperf/Ookla CLI with a tiny exporter) for synthetic throughput checks—feel free to open an issue if you have a preferred tool.
 
 Notes
 - The helper uses `deployment/run-wsl-prom.sh`, which reads your write token from `secrets/grafana_write_token.txt` and writes config to `deployment/prom-wsl.yml`.
@@ -501,7 +468,33 @@ Notes
  - Prometheus TSDB data lives in `data/` (gitignored).
  - Legacy `deployment/.cache/` is no longer used and is gitignored.
 
-Troubleshooting (recap)
-- Empty panels or no data in Grafana Cloud usually means the exporter target is Down. Start the exporter or point Prometheus at the correct host.
-- 404 on remote_write: ensure the write URL is `/api/prom/push` (see `deployment/prometheus-remote-write.yml`).
-- Auth errors: use a Grafana Cloud Access Policy token with `metrics:read` (reads) and `metrics:write` (writes).
+### Internet at a Glance speedtest (iperf3)
+
+We removed the ThousandEyes-powered speedtest panel in November 2025 and replaced it with a lightweight `iperf3` probe. The new exporter runs locally, exposes metrics for Prometheus, and feeds the "Internet at a Glance" card and mini-chart in the dashboard.
+
+Steps:
+
+1. **Install `iperf3` on the helper machine** (Ubuntu example)
+   ```bash
+   sudo apt-get update && sudo apt-get install -y iperf3
+   ```
+   If you cannot use `sudo`, build from source instead (already scripted on this repo host):
+   ```bash
+   cd third_party
+   curl -L https://downloads.es.net/pub/iperf/iperf-3.17.1.tar.gz -o iperf-3.17.1.tar.gz
+   tar -xzf iperf-3.17.1.tar.gz
+   cd iperf-3.17.1
+   ./configure --prefix="$(pwd)/build"
+   make -j"$(nproc)"
+   make install
+   export SPEEDTEST_BINARY="$(pwd)/build/bin/iperf3"
+   ```
+2. **Launch the exporter** – defaults to `iperf.eenet.ee` every 15 minutes. Override as needed.
+   ```bash
+   SPEEDTEST_BINARY=${SPEEDTEST_BINARY:-/usr/bin/iperf3} \
+   SPEEDTEST_SERVER=iperf.eenet.ee \
+   SPEEDTEST_INTERVAL_SECONDS=900 \
+   SPEEDTEST_EXPORTER_PORT=9820 \
+   npm run speedtest:exporter
+   ```
+   Optional env vars: `SPEEDTEST_PORT`, `SPEEDTEST_DURATION_SECONDS`, `SPEEDTEST_ADDITIONAL_ARGS`, `SPEEDTEST_BINARY` (path to `iperf3`). Update cadence in the dashboard Settings (⚙) to keep labels aligned with whatever interval you configure here. If a public endpoint blocks your network, try one of the alternatives in the dropdown (`ping.online.net:5202` is currently the most reliable from the helper box).

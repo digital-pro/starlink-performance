@@ -249,7 +249,21 @@ async function ensureDevServer(projectRoot, baseUrl) {
 async function appendRunRecord(record) {
   const arr = await readJsonArray(runsJsonPath);
   arr.push(record);
-  await writeJsonArray(runsJsonPath, arr);
+  const normalized = arr.map((run) => {
+    const startNum = Number(run.start);
+    const parsedStart = Date.parse(run.timestamp || '') || Date.now();
+    const start = Number.isFinite(startNum) ? startNum : parsedStart;
+    const finishedAt = run.finishedAt || run.completedAt || run.timestamp;
+    const endNum = Number(run.end);
+    const parsedEnd = Date.parse(finishedAt || '') || start;
+    const end = Number.isFinite(endNum) ? endNum : parsedEnd;
+    return {
+      ...run,
+      start,
+      end,
+    };
+  });
+  await writeJsonArray(runsJsonPath, normalized);
   // Push to dashboard for live overlays (best-effort)
   try {
     const headers = { 'Content-Type': 'application/json' };
@@ -259,7 +273,7 @@ async function appendRunRecord(record) {
     await fetch(DEFAULT_PUSH_URL, {
       method: 'POST',
       headers,
-      body: JSON.stringify(arr)
+      body: JSON.stringify(normalized)
     }).catch(() => {});
   } catch {}
   // Deploy and alias by default unless disabled
@@ -269,6 +283,20 @@ async function appendRunRecord(record) {
 async function pushAllRunsNow() {
   try {
     const arr = await readJsonArray(runsJsonPath);
+    const normalized = arr.map((run) => {
+      const startNum = Number(run.start);
+      const parsedStart = Date.parse(run.timestamp || '') || Date.now();
+      const start = Number.isFinite(startNum) ? startNum : parsedStart;
+      const finishedAt = run.finishedAt || run.completedAt || run.timestamp;
+      const endNum = Number(run.end);
+      const parsedEnd = Date.parse(finishedAt || '') || start;
+      const end = Number.isFinite(endNum) ? endNum : parsedEnd;
+      return {
+        ...run,
+        start,
+        end,
+      };
+    });
     const headers = { 'Content-Type': 'application/json' };
     if (process.env.VERCEL_BYPASS_TOKEN) {
       headers['x-vercel-protection-bypass'] = process.env.VERCEL_BYPASS_TOKEN;
@@ -276,7 +304,7 @@ async function pushAllRunsNow() {
     await fetch(DEFAULT_PUSH_URL, {
       method: 'POST',
       headers,
-      body: JSON.stringify(arr)
+      body: JSON.stringify(normalized)
     }).catch(() => {});
   } catch {}
 }
@@ -370,6 +398,8 @@ async function runSpec(specFullPath, projectRoot, cypressLib) {
     totals,
     startPT: `${formatPacificTime(startedAt)} PT`,
     finishPT: `${formatPacificTime(finishedAt)} PT`,
+    start: startedAt.getTime(),
+    end: finishedAt.getTime(),
   };
   if (provider) record.provider = provider;
   if (errorMessage) record.error = errorMessage;

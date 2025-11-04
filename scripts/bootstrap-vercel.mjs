@@ -144,6 +144,7 @@ async function readToken({ argToken }) {
 async function collectDesiredEnv() {
   const grafana = await parseEnvFile(join(secretsDir, 'grafana_env.txt'));
   const blob = await parseEnvFile(join(secretsDir, 'vercel_blob_token.txt'));
+  const blobPublic = await parseEnvFile(join(secretsDir, 'vercel_blob_public.txt'));
 
   const desired = new Map();
 
@@ -157,6 +158,11 @@ async function collectDesiredEnv() {
   if (blobToken) {
     desired.set('BLOB_READ_WRITE_TOKEN', blobToken);
     desired.set('PERFORMANCE_READ_WRITE_TOKEN', blobToken);
+  }
+
+  const blobBaseUrl = blobPublic.get('BLOB_PUBLIC_BASE_URL');
+  if (blobBaseUrl) {
+    desired.set('BLOB_PUBLIC_BASE_URL', blobBaseUrl);
   }
 
   return desired;

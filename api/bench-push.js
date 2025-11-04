@@ -54,25 +54,30 @@ export default async function handler(req, res) {
 
     const objectKey = `benchmarks/${timestamp}.json`;
 
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+
     await put(objectKey, payload, {
       access: 'public',
       contentType: 'application/json',
       cacheControl: 'no-store',
-      addRandomSuffix: false
+      addRandomSuffix: false,
+      token
     });
 
     await put('benchmarks/latest.json', payload, {
       access: 'public',
       contentType: 'application/json',
       cacheControl: 'no-store',
-      addRandomSuffix: false
+      addRandomSuffix: false,
+      token
     });
 
     await put('benchmarks/runs.json', JSON.stringify(runs, null, 2), {
       access: 'public',
       contentType: 'application/json',
       cacheControl: 'no-store',
-      addRandomSuffix: false
+      addRandomSuffix: false,
+      token
     });
 
     globalThis.__BENCH_RUNS_CACHE__ = runs;

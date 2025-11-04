@@ -16,3 +16,6 @@
    - Don't "clean up" or "refactor" unless that's the specific request
 alwaysApply: true
 ---
+
+4. **On new chats, read project READMEs for context**
+   - At the start of a conversation, review all README files in the repository root (and key submodules) to understand current setup and conventions before editing code

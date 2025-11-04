@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const API_URL = process.env.DASHBOARD_URL || 'https://starlink-performance.vercel.app';
+const API_URL = process.env.DASHBOARD_URL || 'https://starlink-performance-digitalpros-projects.vercel.app';
 
 async function readNdjson() {
   const ndjsonPath = path.join(__dirname, 'runs.ndjson');
@@ -31,19 +31,25 @@ async function pushToDashboard(runs) {
   const url = `${API_URL}/api/bench-push`;
   
   // Transform to expected schema
-  const payload = runs.map(r => ({
-    task: r.task || 'unknown',
-    start: Date.parse(r.timestamp) || Date.now(),
-    end: Date.parse(r.finishedAt) || Date.now(),
-    metadata: {
+  const payload = runs.map(r => {
+    const start = Number(r.start) || Date.parse(r.timestamp || '') || Date.now();
+    const end = Number(r.end) || Date.parse(r.finishedAt || r.completedAt || r.timestamp || '') || start;
+    return {
+      task: r.task || 'unknown',
+      timestamp: r.timestamp || new Date(start).toISOString(),
+      finishedAt: r.finishedAt || r.completedAt || new Date(end).toISOString(),
+      start,
+      end,
       status: r.status,
+      real: r.real,
       realSeconds: r.realSeconds,
       cypressDurationMs: r.cypressDurationMs,
       spec: r.spec,
       provider: r.provider,
-      totals: r.totals
-    }
-  }));
+      totals: r.totals,
+      metadata: r.metadata || {},
+    };
+  });
 
   console.log(`Pushing ${payload.length} benchmark runs to ${url}...`);
   
