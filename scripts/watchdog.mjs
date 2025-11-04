@@ -1,14 +1,27 @@
 #!/usr/bin/env node
 import { exec as execCb } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdir } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const exec = promisify(execCb);
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const repoRoot = resolve(__dirname, '..');
+const secretsDir = join(repoRoot, 'secrets');
+const logsDir = join(repoRoot, 'logs');
+const exporterRepoDefault = resolve(repoRoot, '..', 'starlink_exporter');
+
+function dquote(value) {
+  return `"${String(value).replace(/(["\\$`])/g, '\\$1')}"`;
+}
+
 async function run(cmd) {
-  const { stdout, stderr } = await exec(cmd, { env: process.env });
+  const { stdout, stderr } = await exec(cmd, { env: process.env, cwd: repoRoot });
   if (stdout) process.stdout.write(stdout);
   if (stderr) process.stderr.write(stderr);
   return { stdout, stderr };
@@ -16,7 +29,7 @@ async function run(cmd) {
 
 async function getStarlinkTarget() {
   try {
-    const text = await readFile('/home/djc/levante/starlink-performance/secrets/starlink_target.txt', 'utf8');
+    const text = await readFile(join(secretsDir, 'starlink_target.txt'), 'utf8');
     const t = text.trim();
     if (t) return t;
   } catch {}
@@ -68,17 +81,18 @@ async function exporterFreshnessOk() {
 
 async function startExporter() {
   // Try existing binary first; build if missing
-  const bin = '/home/djc/levante/starlink-performance/logs/starlink_exporter';
-  await run('mkdir -p /home/djc/levante/starlink-performance/logs');
+  const bin = join(logsDir, 'starlink_exporter');
+  await mkdir(logsDir, { recursive: true });
   try {
-    await run(`test -x ${bin} || (cd /home/djc/starlink_exporter && go build -o ${bin} ./cmd/starlink_exporter)`);
+    const exporterRepo = process.env.STARLINK_EXPORTER_DIR ? resolve(process.env.STARLINK_EXPORTER_DIR) : exporterRepoDefault;
+    await run(`test -x ${dquote(bin)} || (cd ${dquote(exporterRepo)} && go build -o ${dquote(bin)} ./cmd/starlink_exporter)`);
   } catch {}
   const dishAddr = process.env.STARLINK_DISH_ADDR || '192.168.100.1:9201';
-  await run(`nohup ${bin} -address ${dishAddr} -port 9817 > /home/djc/levante/starlink-performance/logs/starlink_exporter.out 2>&1 & echo $! > /home/djc/levante/starlink-performance/logs/starlink_exporter.pid`);
+  await run(`nohup ${dquote(bin)} -address ${dishAddr} -port 9817 > ${dquote(join(logsDir, 'starlink_exporter.out'))} 2>&1 & echo $! > ${dquote(join(logsDir, 'starlink_exporter.pid'))}`);
 }
 
 async function restartProm() {
-  await run('node /home/djc/levante/starlink-performance/scripts/ops-restart.mjs');
+  await run(`node ${dquote(join(repoRoot, 'scripts', 'ops-restart.mjs'))}`);
 }
 
 (async () => {

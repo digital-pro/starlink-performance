@@ -1,9 +1,16 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const repoRoot = resolve(__dirname, '..');
+const secretsDir = join(repoRoot, 'secrets');
 
 async function readToken() {
   if (process.env.GRAFANA_API_TOKEN && process.env.GRAFANA_API_TOKEN.trim()) return process.env.GRAFANA_API_TOKEN.trim();
-  const t = await readFile('/home/djc/levante/starlink-performance/secrets/grafana_api_token.txt', 'utf8');
+  const t = await readFile(join(secretsDir, 'grafana_api_token.txt'), 'utf8');
   const token = t.trim();
   if (!token) throw new Error('grafana_api_token.txt is empty');
   return token;

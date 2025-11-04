@@ -1,11 +1,23 @@
 import { exec as execCb } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const repoRoot = resolve(__dirname, '..');
+const secretsDir = join(repoRoot, 'secrets');
+const logsDir = join(repoRoot, 'logs');
 
 const exec = promisify(execCb);
 
+function dquote(value) {
+  return `"${String(value).replace(/(["\\$`])/g, '\\$1')}"`;
+}
+
 async function run(cmd) {
-  const { stdout, stderr } = await exec(cmd, { env: process.env });
+  const { stdout, stderr } = await exec(cmd, { env: process.env, cwd: repoRoot });
   if (stdout) process.stdout.write(stdout);
   if (stderr) process.stderr.write(stderr);
   return { stdout, stderr };
@@ -28,7 +40,7 @@ function parseEnvFromFile(text) {
 async function getInstanceId() {
   if (process.env.INSTANCE_ID && process.env.INSTANCE_ID.trim()) return process.env.INSTANCE_ID.trim();
   try {
-    const text = await readFile('/home/djc/levante/starlink-performance/secrets/grafana_env.txt', 'utf8');
+    const text = await readFile(join(secretsDir, 'grafana_env.txt'), 'utf8');
     const envs = parseEnvFromFile(text);
     if (envs.PROM_USER && envs.PROM_USER.trim()) return envs.PROM_USER.trim();
   } catch {}
@@ -38,7 +50,7 @@ async function getInstanceId() {
 async function getStarlinkTarget() {
   if (process.env.STARLINK_TARGET && process.env.STARLINK_TARGET.trim()) return process.env.STARLINK_TARGET.trim();
   try {
-    const text = await readFile('/home/djc/levante/starlink-performance/secrets/starlink_target.txt', 'utf8');
+    const text = await readFile(join(secretsDir, 'starlink_target.txt'), 'utf8');
     const target = text.trim();
     if (target) return target;
   } catch {}
@@ -67,11 +79,11 @@ async function waitForTargets(timeoutMs = 20000) {
 
     console.log(`Stopping Prometheus (if running)...`);
     try {
-      await run("pkill -f '/home/djc/levante/starlink-performance/logs/prometheus/prometheus'");
+      await run(`pkill -f ${dquote(join(logsDir, 'prometheus', 'prometheus'))}`);
     } catch {}
 
     console.log(`Starting Prometheus with INSTANCE_ID=${instanceId} STARLINK_TARGET=${starlinkTarget} ...`);
-    await run(`bash /home/djc/levante/starlink-performance/deployment/run-wsl-prom.sh --instance ${instanceId} --starlink ${starlinkTarget} --bg`);
+    await run(`bash ${dquote(join(repoRoot, 'deployment', 'run-wsl-prom.sh'))} --instance ${instanceId} --starlink ${starlinkTarget} --bg`);
 
     console.log('Waiting for targets...');
     const data = await waitForTargets();

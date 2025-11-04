@@ -1,10 +1,19 @@
 #!/usr/bin/env node
 import { readFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const repoRoot = resolve(__dirname, '..');
+const secretsDir = join(repoRoot, 'secrets');
+const vueAppPath = join(repoRoot, 'apps', 'vue-dashboard', 'src', 'App.vue');
+const dashboardPath = join(repoRoot, 'deployment', 'grafana-dashboard-starlink.json');
 
 async function readToken() {
   if (process.env.GRAFANA_API_TOKEN && process.env.GRAFANA_API_TOKEN.trim()) return process.env.GRAFANA_API_TOKEN.trim();
   try {
-    const t = await readFile('/home/djc/levante/starlink-performance/secrets/grafana_api_token.txt', 'utf8');
+    const t = await readFile(join(secretsDir, 'grafana_api_token.txt'), 'utf8');
     const token = t.trim();
     if (!token) throw new Error('grafana_api_token.txt is empty');
     return token;
@@ -17,7 +26,7 @@ async function resolveStackHost() {
   if (process.env.STACK_HOST && process.env.STACK_HOST.trim()) return process.env.STACK_HOST.trim();
   // Attempt to parse from the Vue app link
   try {
-    const app = await readFile('/home/djc/levante/starlink-performance/apps/vue-dashboard/src/App.vue', 'utf8');
+    const app = await readFile(vueAppPath, 'utf8');
     const m = app.match(/https:\/\/([a-z0-9-]+\.grafana\.net)\//i);
     if (m && m[1]) return m[1];
   } catch {}
@@ -27,7 +36,7 @@ async function resolveStackHost() {
 async function main() {
   const token = await readToken();
   const host = await resolveStackHost();
-  const jsonText = await readFile('/home/djc/levante/starlink-performance/deployment/grafana-dashboard-starlink.json', 'utf8');
+  const jsonText = await readFile(dashboardPath, 'utf8');
   const dashboard = JSON.parse(jsonText);
   const payload = { dashboard, overwrite: true, folderId: 0 };
 
