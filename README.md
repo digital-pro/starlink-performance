@@ -121,6 +121,41 @@ npm run build
 npm run preview  # serves ./public on http://localhost:5175
 ```
 
+### New machine checklist (WSL + Windows host)
+
+1. **Install Netdata (powers anomaly detection & events)**
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y netdata
+   sudo systemctl enable --now netdata
+   sudo ss -ltnp | grep 19999   # Netdata should be listening
+   ```
+
+2. **Enable systemd inside WSL** (needed for the bundled autostart service)
+   - Edit `/etc/wsl.conf` and add:
+     ```ini
+     [boot]
+     systemd=true
+     ```
+   - From Windows, run `wsl --shutdown`, then launch Ubuntu again.
+   - Verify with `ps -p 1 -o comm=` → `systemd`.
+
+3. **Enable the Starlink stack service**
+   ```bash
+   systemctl --user daemon-reload
+   systemctl --user enable --now starlink-performance.service
+   systemctl --user status starlink-performance.service
+   ```
+   This service runs `npm run restart:stack` on boot and keeps the watchdog active so Prometheus, the exporter, and helper scripts recover automatically.
+
+4. **Validate the pipeline**
+   ```bash
+   npm run prom:targets      # starlink + netdata should report "health":"up"
+   curl -s https://levante-performance.vercel.app/api/promql?query=up
+   ```
+
+5. *(Optional)* **Windows helper** – if you prefer the exporter to run on Windows, reuse `C:\Users\<you>\levante\start_starlink_exporter.ps1` and register it with `schtasks /Create … /SC ONLOGON`. The WSL service above is the default path.
+
 ---
 
 ## Configure Grafana Cloud access (for /api/promql)

@@ -2,6 +2,25 @@
 
 The Starlink Performance monitoring stack is now configured to **automatically start on boot** via systemd user service.
 
+## Prerequisites
+
+1. **Enable systemd inside WSL** (required once per distro)
+   ```ini
+   # /etc/wsl.conf
+   [boot]
+   systemd=true
+   ```
+   After editing, run `wsl --shutdown` from Windows and reopen the distro. Verify with `ps -p 1 -o comm=` → `systemd`.
+
+2. **Install & enable Netdata** (feeds anomaly detection + events)
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y netdata
+   sudo systemctl enable --now netdata
+   sudo ss -ltnp | grep 19999
+   ```
+   Netdata must be running for the “Anomaly Detection & Starlink Events” panel to populate.
+
 ## What Gets Started
 
 1. **Starlink Exporter** (port 9817) - Collects metrics from Starlink dish
@@ -95,3 +114,13 @@ ps aux | grep -E "(starlink|prometheus)" | grep -v grep
 6. Watchdog starts (monitors and auto-restarts if needed)
 
 No manual intervention required! 🎉
+
+### Optional: Windows exporter scheduled task
+
+If you ever need the exporter to run on the Windows host instead of WSL (for example, while debugging WSL networking), reuse `C:\Users\<you>\levante\start_starlink_exporter.ps1` and register it from an elevated PowerShell:
+
+```powershell
+schtasks /Create /TN "StarlinkExporter" /TR 'powershell.exe -ExecutionPolicy Bypass -File "C:\Users\<you>\levante\start_starlink_exporter.ps1"' /SC ONLOGON /RL HIGHEST /F
+```
+
+Disable it again with `schtasks /Change /TN "StarlinkExporter" /Disable` when the WSL service is handling the stack.
