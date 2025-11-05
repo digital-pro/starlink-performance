@@ -14,7 +14,7 @@ const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, '..');
 const secretsDir = join(repoRoot, 'secrets');
 const logsDir = join(repoRoot, 'logs');
-const exporterRepoDefault = resolve(repoRoot, '..', 'starlink_exporter');
+const exporterRepoDefault = resolve(repoRoot, 'starlink_exporter');
 
 function dquote(value) {
   return `"${String(value).replace(/(["\\$`])/g, '\\$1')}"`;

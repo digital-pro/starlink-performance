@@ -226,47 +226,7 @@
             </div>
           </section>
 
-          <section>
-            <h4 style="margin:0 0 8px 0; font-size:14px; color:#334;">Diagnostic visibility</h4>
-            <p style="margin:0 0 12px 0; font-size:12px; color:#667;">Enable charts that currently report zero data so you can keep them handy when values return.</p>
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px;">
-              <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border:1px solid #ccd; border-radius:6px; font-size:12px; color:#445; background:#f8f9fb;">
-                <span>SNR (dB)</span>
-                <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#556;">
-                  <span>Visible</span>
-                  <input type="checkbox" v-model="diagnosticVisibility.snr" />
-                </label>
-              </label>
-              <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border:1px solid #ccd; border-radius:6px; font-size:12px; color:#445; background:#f8f9fb;">
-                <span>Dish State</span>
-                <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#556;">
-                  <span>Visible</span>
-                  <input type="checkbox" v-model="diagnosticVisibility.dishState" />
-                </label>
-              </label>
-              <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border:1px solid #ccd; border-radius:6px; font-size:12px; color:#445; background:#f8f9fb;">
-                <span>Backup Beam</span>
-                <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#556;">
-                  <span>Visible</span>
-                  <input type="checkbox" v-model="diagnosticVisibility.backupBeam" />
-                </label>
-              </label>
-              <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border:1px solid #ccd; border-radius:6px; font-size:12px; color:#445; background:#f8f9fb;">
-                <span>Time to Slot End</span>
-                <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#556;">
-                  <span>Visible</span>
-                  <input type="checkbox" v-model="diagnosticVisibility.slotEnd" />
-                </label>
-              </label>
-              <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border:1px solid #ccd; border-radius:6px; font-size:12px; color:#445; background:#f8f9fb;">
-                <span>First Slot</span>
-                <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#556;">
-                  <span>Visible</span>
-                  <input type="checkbox" v-model="diagnosticVisibility.firstSlot" />
-                </label>
-              </label>
-            </div>
-          </section>
+          <div />
         </div>
       </div>
     </div>
@@ -326,45 +286,12 @@
         </div>
       </div>
 
-      <div v-if="anyDiagnosticsVisible" style="margin-top:16px; display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:8px;">
-        <div v-if="diagnosticVisibility.snr" style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
-          <div style="font-size:11px; color:#778; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
-            <span>SNR (dB)</span>
-          </div>
-          <div v-if="snrSeries.length === 0" style="height:100px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="snrOption" autoresize style="height:120px;" />
-        </div>
-
-        <div v-if="diagnosticVisibility.dishState" style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
-          <div style="font-size:11px; color:#778; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
-            <span>Dish State</span>
-          </div>
-          <div v-if="dishStateSeries.length === 0" style="height:100px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="dishStateOption" autoresize style="height:120px;" />
-        </div>
-
-        <div v-if="diagnosticVisibility.backupBeam" style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
-          <div style="font-size:11px; color:#778; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
-            <span>Backup Beam</span>
-          </div>
-          <div v-if="backupBeamSeries.length === 0" style="height:100px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="backupBeamOption" autoresize style="height:120px;" />
-        </div>
-
-        <div v-if="diagnosticVisibility.slotEnd" style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
-          <div style="font-size:11px; color:#778; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
-            <span>Time to Slot End (s)</span>
-          </div>
-          <div v-if="slotEndSeries.length === 0" style="height:100px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="slotEndOption" autoresize style="height:120px;" />
-        </div>
-
-        <div v-if="diagnosticVisibility.firstSlot" style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
+      <div v-if="firstSlotSeries.length > 0" style="margin-top:16px; display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:8px;">
+        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
           <div style="font-size:11px; color:#778; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
             <span>First Slot (s)</span>
           </div>
-          <div v-if="firstSlotSeries.length === 0" style="height:100px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="firstSlotOption" autoresize style="height:120px;" />
+          <v-chart :option="firstSlotOption" autoresize style="height:120px;" />
         </div>
       </div>
     </section>
@@ -372,7 +299,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, reactive } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import axios from 'axios';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -498,23 +425,6 @@ const speedtestSettings = ref<{ server: string; intervalMinutes: number }>({
   intervalMinutes: readNumberSetting('starlink_speedtest_interval_minutes', 15)
 });
 
-const storedDiagnosticsVisibility = (() => {
-  if (!isBrowser) return {} as Record<string, boolean>;
-  try {
-    const raw = localStorage.getItem('starlink_diagnostics_visibility');
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-})();
-
-const diagnosticVisibility = reactive({
-  snr: Boolean((storedDiagnosticsVisibility as any).snr),
-  dishState: Boolean((storedDiagnosticsVisibility as any).dishState),
-  backupBeam: Boolean((storedDiagnosticsVisibility as any).backupBeam),
-  slotEnd: Boolean((storedDiagnosticsVisibility as any).slotEnd),
-  firstSlot: Boolean((storedDiagnosticsVisibility as any).firstSlot)
-});
 
 // Desired order: Down (upper-left), Latency (upper-right), Up (lower-left), Packet Loss (lower-right)
 const metricCards = [
@@ -794,11 +704,14 @@ async function refreshAll() {
   const stepRaw = Math.floor(seconds / 60);
   const step = Number.isFinite(stepRaw) && stepRaw > 0 ? Math.max(10, stepRaw) : 60;
 
+  const downRateExpr = '(clamp_min(starlink_dish_downlink_throughput_bps_avg_10s / 1e6, 0)) or starlink_down_mbps';
+  const upRateExpr = '(clamp_min(starlink_dish_uplink_throughput_bps_avg_10s / 1e6, 0)) or starlink_up_mbps';
+
   const q = {
     latency: 'starlink_latency_ms',
     packetLoss: 'starlink_packet_loss_pct',
-    bandwidthDown: 'starlink_down_mbps',
-    bandwidthUp: 'starlink_up_mbps'
+    bandwidthDown: downRateExpr,
+    bandwidthUp: upRateExpr
   } as const;
 
   const [lat, pl, dMbps, uMbps] = await Promise.all([
@@ -831,13 +744,13 @@ async function refreshAll() {
   latencySeries.value = await fetchRangeProm(q.latency, seconds, step, fixedEnd);
   packetLossSeries.value = await fetchRangeProm(q.packetLoss, seconds, step, fixedEnd);
   const [down, up, ml, downMBm, upMBm, downMB10, upMB10, speedDownRange, speedUpRange] = await Promise.all([
-    fetchRangeProm(q.bandwidthDown, seconds, step, fixedEnd),
-    fetchRangeProm(q.bandwidthUp, seconds, step, fixedEnd),
+    fetchRangeProm(downRateExpr, seconds, step, fixedEnd),
+    fetchRangeProm(upRateExpr, seconds, step, fixedEnd),
     fetchRangeProm('starlink_micro_loss', seconds, step, fixedEnd),
-    fetchRangeProm('avg_over_time(starlink_dish_downlink_throughput_bytes[1m]) * 60 / 1e6', seconds, step, fixedEnd),
-    fetchRangeProm('avg_over_time(starlink_dish_uplink_throughput_bytes[1m]) * 60 / 1e6', seconds, step, fixedEnd),
-    fetchRangeProm('sum_over_time(starlink_dish_downlink_throughput_bytes[10m]) / 1e6', seconds, step, fixedEnd),
-    fetchRangeProm('sum_over_time(starlink_dish_uplink_throughput_bytes[10m]) / 1e6', seconds, step, fixedEnd),
+    fetchRangeProm('avg_over_time(starlink_dish_downlink_throughput_bps_avg_10s[1m]) * 60 / 8000000', seconds, step, fixedEnd),
+    fetchRangeProm('avg_over_time(starlink_dish_uplink_throughput_bps_avg_10s[1m]) * 60 / 8000000', seconds, step, fixedEnd),
+    fetchRangeProm('avg_over_time(starlink_dish_downlink_throughput_bps_avg_10s[10m]) * 600 / 8000000', seconds, step, fixedEnd),
+    fetchRangeProm('avg_over_time(starlink_dish_uplink_throughput_bps_avg_10s[10m]) * 600 / 8000000', seconds, step, fixedEnd),
     fetchRangeProm('starlink_speedtest_download_mbps', seconds, step, fixedEnd),
     fetchRangeProm('starlink_speedtest_upload_mbps', seconds, step, fixedEnd)
   ]);
@@ -860,19 +773,11 @@ async function refreshAll() {
   console.log(`📊 Anomaly series: ${anomalySeries.value.length} data points`);
 
   // Diagnostic charts
-  const [snr, dishState, backupBeam, slotEnd, azimuth, elevation, firstSlot] = await Promise.all([
-    fetchRangeProm('starlink_dish_snr', seconds, step, fixedEnd),
-    fetchRangeProm('starlink_dish_state', seconds, step, fixedEnd),
-    fetchRangeProm('starlink_dish_backup_beam', seconds, step, fixedEnd),
-    fetchRangeProm('starlink_dish_time_to_slot_end_seconds', seconds, step, fixedEnd),
+  const [azimuth, elevation, firstSlot] = await Promise.all([
     fetchRangeProm('starlink_dish_bore_sight_azimuth_deg', seconds, step, fixedEnd),
     fetchRangeProm('starlink_dish_bore_sight_elevation_deg', seconds, step, fixedEnd),
     fetchRangeProm('starlink_dish_first_nonempty_slot_seconds', seconds, step, fixedEnd)
   ]);
-  snrSeries.value = snr;
-  dishStateSeries.value = dishState;
-  backupBeamSeries.value = backupBeam;
-  slotEndSeries.value = slotEnd;
   azimuthSeries.value = azimuth;
   elevationSeries.value = elevation;
   firstSlotSeries.value = firstSlot;
@@ -914,13 +819,17 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
   
   try {
     // Fetch metrics for smart event detection
-    const [downThroughput, upThroughput, obstructionFraction, packetLoss, latency] = await Promise.all([
-      fetchRangeProm('starlink_dish_downlink_throughput_bytes', seconds, step, fixedEnd),    // User download (satellite→dish)
-      fetchRangeProm('starlink_dish_uplink_throughput_bytes', seconds, step, fixedEnd),      // User upload (dish→satellite)
+    const [downThroughputBits, upThroughputBits, obstructionFraction, packetLoss, latency] = await Promise.all([
+      fetchRangeProm('starlink_dish_downlink_throughput_bps_avg_10s', seconds, step, fixedEnd),
+      fetchRangeProm('starlink_dish_uplink_throughput_bps_avg_10s', seconds, step, fixedEnd),
       fetchRangeProm('starlink_dish_fraction_obstruction_ratio', seconds, step, fixedEnd),
       fetchRangeProm('starlink_dish_pop_ping_drop_ratio', seconds, step, fixedEnd),
       fetchRangeProm('starlink_dish_pop_ping_latency_seconds', seconds, step, fixedEnd)
     ]);
+    
+    const toBytesPerSecond = (series: Array<[number, number]>) => series.map(([ts, val]) => [ts, val / 8] as [number, number]);
+    const downThroughput = toBytesPerSecond(downThroughputBits);
+    const upThroughput = toBytesPerSecond(upThroughputBits);
     
     let inSkySearch = false;
     let inObstruction = false;
@@ -1159,10 +1068,6 @@ const anomalySeries = ref<Array<[number, number]>>([]);
 const starlinkEvents = ref<Array<{ time: string; timestamp: number; message: string; icon: string; color: string }>>([]);
 
 // Diagnostic charts series
-const snrSeries = ref<Array<[number, number]>>([]);
-const dishStateSeries = ref<Array<[number, number]>>([]);
-const backupBeamSeries = ref<Array<[number, number]>>([]);
-const slotEndSeries = ref<Array<[number, number]>>([]);
 const azimuthSeries = ref<Array<[number, number]>>([]);
 const elevationSeries = ref<Array<[number, number]>>([]);
 const firstSlotSeries = ref<Array<[number, number]>>([]);
@@ -1203,7 +1108,6 @@ const showSyntheticSpeedtest = computed(() => (
   syntheticDownInstant.value !== null &&
   syntheticUpInstant.value !== null
 ));
-const anyDiagnosticsVisible = computed(() => Object.values(diagnosticVisibility).some(Boolean));
 const speedtestServerLabel = computed(() => {
   const match = speedtestServerOptions.find((opt) => opt.value === speedtestSettings.value.server);
   return match ? match.label : speedtestSettings.value.server;
@@ -1577,94 +1481,7 @@ const speedtestFallbackOption = computed(() => {
   };
 });
 
-// Diagnostic chart options
-const snrOption = computed(() => {
-  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
-  const windowStart = now - (rangeSeconds.value * 1000);
-  const data = snrSeries.value.filter(([t]) => t >= windowStart);
-  const range = computeAxisRange(data, 0.1, { min: 0, max: 20 }, { includeZero: false, minSpan: 0.001 });
-  return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
-    grid: { left: 35, right: 10, top: 5, bottom: 20 },
-    xAxis: { type: 'time', show: false },
-    yAxis: { type: 'value', name: 'dB', min: range.min, max: range.max, scale: true },
-    series: [{
-      type: 'line',
-      name: 'SNR',
-      data,
-      showSymbol: false,
-      smooth: true,
-      lineStyle: { width: 1.5, color: '#00897b' }
-    }]
-  };
-});
-
-const dishStateOption = computed(() => {
-  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
-  const windowStart = now - (rangeSeconds.value * 1000);
-  const data = dishStateSeries.value.filter(([t]) => t >= windowStart);
-  const range = computeAxisRange(data, 0.1, { min: 0, max: 3 }, { includeZero: true, minSpan: 0.1 });
-  return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
-    grid: { left: 35, right: 10, top: 5, bottom: 20 },
-    xAxis: { type: 'time', show: false },
-    yAxis: { type: 'value', name: 'State', min: range.min, max: range.max, scale: true },
-    series: [{
-      type: 'line',
-      name: 'State',
-      data,
-      showSymbol: false,
-      smooth: true,
-      lineStyle: { width: 1.5, color: '#50c878' },
-      areaStyle: { color: 'rgba(80, 200, 120, 0.1)' }
-    }]
-  };
-});
-
-const backupBeamOption = computed(() => {
-  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
-  const windowStart = now - (rangeSeconds.value * 1000);
-  const data = backupBeamSeries.value.filter(([t]) => t >= windowStart);
-  const range = computeAxisRange(data, 0.1, { min: 0, max: 1 }, { includeZero: true, minSpan: 0.05 });
-  return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
-    grid: { left: 35, right: 10, top: 5, bottom: 20 },
-    xAxis: { type: 'time', show: false },
-    yAxis: { type: 'value', name: 'Backup', min: range.min, max: range.max, scale: true },
-    series: [{
-      type: 'line',
-      name: 'Backup Beam',
-      data,
-      showSymbol: false,
-      smooth: true,
-      lineStyle: { width: 1.5, color: '#ff9500' },
-      areaStyle: { color: 'rgba(255, 149, 0, 0.1)' }
-    }]
-  };
-});
-
-const slotEndOption = computed(() => {
-  const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
-  const windowStart = now - (rangeSeconds.value * 1000);
-  const data = slotEndSeries.value.filter(([t]) => t >= windowStart);
-  const range = computeAxisRange(data, 0.1, { min: 0, max: 10 }, { includeZero: true, minSpan: 0.1 });
-  return {
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
-    grid: { left: 35, right: 10, top: 5, bottom: 20 },
-    xAxis: { type: 'time', show: false },
-    yAxis: { type: 'value', name: 's', min: range.min, max: range.max, scale: true },
-    series: [{
-      type: 'line',
-      name: 'Slot End',
-      data,
-      showSymbol: false,
-      smooth: true,
-      lineStyle: { width: 1.5, color: '#9b59b6' },
-      areaStyle: { color: 'rgba(155, 89, 182, 0.1)' }
-    }]
-  };
-});
-
+// Diagnostic chart options remaining
 const azimuthOption = computed(() => {
   const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
   const windowStart = now - (rangeSeconds.value * 1000);
@@ -1816,11 +1633,6 @@ watch(() => speedtestSettings.value.intervalMinutes, (val) => {
   }
   localStorage.setItem('starlink_speedtest_interval_minutes', String(next));
 });
-
-watch(diagnosticVisibility, (val) => {
-  if (!isBrowser) return;
-  localStorage.setItem('starlink_diagnostics_visibility', JSON.stringify(val));
-}, { deep: true });
 
 onMounted(() => {
   refreshAll();

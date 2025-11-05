@@ -84,8 +84,8 @@ curl -s "http://localhost:9090/api/v1/query?query=starlink_dish_uplink_throughpu
 
 ```bash
 # Rebuild exporter with new code
-cd /home/djc/starlink_exporter
-go build -o /home/djc/levante/starlink-performance/logs/starlink_exporter ./cmd/starlink_exporter
+cd ~/levante/starlink-performance/starlink_exporter
+go build -o ../logs/starlink_exporter ./cmd/starlink_exporter
 
 # Restart monitoring stack
 cd /home/djc/levante/starlink-performance

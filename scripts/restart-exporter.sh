@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 LOG_DIR="$ROOT_DIR/logs"
-EXPORTER_DIR="${STARLINK_EXPORTER_DIR:-$ROOT_DIR/../starlink_exporter}"
+EXPORTER_DIR="${STARLINK_EXPORTER_DIR:-$ROOT_DIR/starlink_exporter}"
 BIN="$LOG_DIR/starlink_exporter"
 PID_FILE="$LOG_DIR/starlink_exporter.pid"
 OUT_FILE="$LOG_DIR/starlink_exporter.out"

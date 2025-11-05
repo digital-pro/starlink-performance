@@ -305,9 +305,8 @@ The dashboard uses the standard `danopstech/starlink_exporter` to collect metric
 
 **Building from Source**:
 ```bash
-cd /home/djc/starlink_exporter
-# The exporter_history.go file is already added
-go build -o /home/djc/levante/starlink-performance/logs/starlink_exporter ./cmd/starlink_exporter
+cd ~/levante/starlink-performance/starlink_exporter
+go build -o ../logs/starlink_exporter ./cmd/starlink_exporter
 npm run restart:exporter  # Restart with new binary
 ```
 
