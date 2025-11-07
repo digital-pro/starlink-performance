@@ -159,7 +159,16 @@ def robust_zscore(series: pd.Series, window: int) -> pd.Series:
         lambda x: np.median(np.abs(x - np.median(x))), raw=True
     )
     mad_adjusted = mad * 1.4826
-    z = (clean - median) / mad_adjusted.replace({0: np.nan})
+    denom = mad_adjusted.replace({0: np.nan})
+    z = (clean - median) / denom
+
+    needs_fallback = z.isna() | ~np.isfinite(z)
+    if needs_fallback.any():
+        std = clean.rolling(window, min_periods=window).std(ddof=0)
+        std = std.replace({0: np.nan})
+        fallback = (clean - median) / std
+        z = z.where(~needs_fallback, fallback)
+
     return z.dropna()
 
 

@@ -44,10 +44,9 @@
     <!-- Totals and Diagnostics in one row -->
     <section style="margin-top: 12px;">
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:8px;">
-        <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Sum of actual Starlink telemetry data over selected time range (excludes synthetic speedtest traffic)">
+        <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Sum of downlink Mbps over selected time range converted to GB (assumes 15s scrape interval)">
           <div style="font-size:11px; color:#778;">Download ({{ rangeLabel }})</div>
           <div style="font-size:18px; font-weight:600;">{{ typeof totalDownGb === 'number' ? totalDownGb.toFixed(2) : 'N/A' }} GB</div>
-          <div style="font-size:10px; color:#99a;">Real usage only</div>
         </div>
         <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Windows WiFi adapter link speed (Mbps). This is the negotiated connection speed between your WiFi adapter and Starlink router.">
           <div style="font-size:11px; color:#778;">WiFi Speed</div>
@@ -749,22 +748,14 @@ async function refreshAll() {
   metrics.value.bandwidthDown = dMbps;
   metrics.value.bandwidthUp = uMbps;
 
-  // Total download (GB) over selected time range; assumes 15s scrape interval
-  // Note: starlink_down_mbps includes ALL traffic including synthetic speedtest
-  // Speedtest runs 30s every 10 min (5% of time), estimate ~20 Mbps avg
-  // Speedtest contribution = rangeHours * 6 tests/hr * 30s * 20 Mbps / 8 / 1000 = rangeHours * 0.45 GB
+  // Total download (GB) over selected time range
+  // Use rate() to get bytes/sec, then multiply by time range to get total bytes
   const rangeMinutes = Math.floor(seconds / 60);
-  const rangeHours = rangeMinutes / 60;
   const rangeQuery = rangeMinutes >= 60 
-    ? `sum_over_time(starlink_down_mbps[${Math.floor(rangeMinutes / 60)}h]) * 15 / 8000`
-    : `sum_over_time(starlink_down_mbps[${rangeMinutes}m]) * 15 / 8000`;
-  const totalGbRaw = await fetchInstantProm(rangeQuery, fixedEnd);
-  // Subtract estimated speedtest contribution (0.45 GB per hour)
-  const speedtestGb = rangeHours * 0.45;
-  const totalGbReal = typeof totalGbRaw === 'number' && Number.isFinite(totalGbRaw) 
-    ? Math.max(0, totalGbRaw - speedtestGb) 
-    : totalGbRaw;
-  totalDownGb.value = typeof totalGbReal === 'number' && Number.isFinite(totalGbReal) ? totalGbReal : 'N/A';
+    ? `(rate(starlink_dish_downlink_throughput_bytes[${Math.floor(rangeMinutes / 60)}h]) * ${seconds}) / 1e9`
+    : `(rate(starlink_dish_downlink_throughput_bytes[${rangeMinutes}m]) * ${seconds}) / 1e9`;
+  const totalGb = await fetchInstantProm(rangeQuery, fixedEnd);
+  totalDownGb.value = typeof totalGb === 'number' && Number.isFinite(totalGb) ? totalGb : 'N/A';
 
   // WiFi link speed (Mbps): windows_wifi_link_speed_mbps - connection speed between computer and Starlink router
   const wifi = await fetchInstantProm('windows_wifi_link_speed_mbps', fixedEnd);
@@ -815,7 +806,7 @@ async function refreshAll() {
   downMbPer10MinSeries.value = clampSeriesPercentile(downMB10, 0.95, 1.3, 30000);
   upMbPer10MinSeries.value = clampSeriesPercentile(upMB10, 0.95, 1.3, 30000);
 
-  await loadStarlinkAnomalyScore(seconds, step);
+  await loadStarlinkAnomalyScore(seconds, step, fixedEnd);
 
   // Diagnostic charts
   const [azimuth, elevation, firstSlot] = await Promise.all([
@@ -859,7 +850,7 @@ async function refreshAll() {
   await loadStarlinkEvents(seconds, 30, fixedEnd);
 }
 
-async function loadStarlinkAnomalyScore(seconds: number, step: number) {
+async function loadStarlinkAnomalyScore(seconds: number, step: number, fixedEnd: number) {
   try {
     const pointsGuess = Math.max(120, Math.min(1800, Math.ceil(seconds / Math.max(step, 10))));
     const res = await axios.get('/api/starlink-anomalies', {
@@ -890,6 +881,118 @@ async function loadStarlinkAnomalyScore(seconds: number, step: number) {
     }
   } catch (err) {
     console.error('Failed to fetch starlink anomalies', err);
+    await computeLocalAnomalyFallback(seconds, step, fixedEnd);
+  }
+}
+
+function computeMedian(values: number[]) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+function computeStdDev(values: number[]) {
+  if (!values.length) return 0;
+  const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+  const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
+  return Math.sqrt(variance);
+}
+
+function computeZscoreSeries(series: Array<[number, number]>, windowSamples: number) {
+  const result: Array<[number, number]> = [];
+  const values = series.map(([, value]) => Number(value));
+  for (let i = 0; i < series.length; i++) {
+    const ts = series[i][0];
+    if (i + 1 < windowSamples) {
+      result.push([ts, 0]);
+      continue;
+    }
+    const windowValues = values.slice(i - windowSamples + 1, i + 1);
+    const median = computeMedian(windowValues);
+    const deviations = windowValues.map((v) => Math.abs(v - median));
+    let denom = computeMedian(deviations) * 1.4826;
+    if (!Number.isFinite(denom) || denom === 0) {
+      denom = computeStdDev(windowValues);
+    }
+    if (!Number.isFinite(denom) || denom === 0) {
+      result.push([ts, 0]);
+      continue;
+    }
+    const z = (values[i] - median) / denom;
+    result.push([ts, z]);
+  }
+  return result;
+}
+
+async function computeLocalAnomalyFallback(seconds: number, step: number, fixedEnd: number) {
+  try {
+    const pointsGuess = Math.max(120, Math.min(1800, Math.ceil(seconds / Math.max(step, 10))));
+    const windowSamples = Math.max(20, Math.floor(pointsGuess * 0.1));
+    const threshold = 3.5;
+
+    const [downSeries, upSeries, latencySeries, lossSeries, obstructionSeries] = await Promise.all([
+      fetchRangeProm('starlink_dish_downlink_throughput_bps_avg_10s', seconds, step, fixedEnd).then((series) => series.map(([ts, v]) => [ts, v / 8] as [number, number])),
+      fetchRangeProm('starlink_dish_uplink_throughput_bps_avg_10s', seconds, step, fixedEnd).then((series) => series.map(([ts, v]) => [ts, v / 8] as [number, number])),
+      fetchRangeProm('starlink_dish_pop_ping_latency_seconds', seconds, step, fixedEnd).then((series) => series.map(([ts, v]) => [ts, v * 1000] as [number, number])),
+      fetchRangeProm('starlink_dish_pop_ping_drop_ratio', seconds, step, fixedEnd),
+      fetchRangeProm('starlink_dish_fraction_obstruction_ratio', seconds, step, fixedEnd)
+    ]);
+
+    const metricSeries: Record<string, Array<[number, number]>> = {
+      down: downSeries,
+      up: upSeries,
+      latency: latencySeries,
+      loss: lossSeries,
+      obstruction: obstructionSeries,
+    };
+
+    const zscoreSeries: Record<string, Array<[number, number]>> = {};
+    Object.entries(metricSeries).forEach(([key, series]) => {
+      zscoreSeries[key] = computeZscoreSeries(series, windowSamples);
+    });
+
+    const events: Array<{ metric: string; timestamp: number; iso: string; value: number; zscore: number }> = [];
+    Object.entries(zscoreSeries).forEach(([metric, series]) => {
+      const source = metricSeries[metric];
+      series.forEach(([ts, z], idx) => {
+        if (!Number.isFinite(z)) return;
+        if (Math.abs(z) >= threshold) {
+          const value = source[idx]?.[1] ?? 0;
+          events.push({
+            metric,
+            timestamp: ts,
+            iso: new Date(ts).toISOString(),
+            value,
+            zscore: z,
+          });
+        }
+      });
+    });
+
+    events.sort((a, b) => a.timestamp - b.timestamp);
+    starlinkAnomalyEvents.value = events;
+
+    const zscoreLists = Object.values(zscoreSeries).filter((series) => series.length > 0);
+    if (zscoreLists.length === 0) {
+      anomalySeries.value = [];
+      return;
+    }
+    const minLength = Math.min(...zscoreLists.map((series) => series.length));
+    const score: Array<[number, number]> = [];
+    for (let i = 0; i < minLength; i++) {
+      const ts = zscoreLists[0][i][0];
+      const maxAbs = Math.max(
+        ...Object.values(zscoreSeries).map((series) => {
+          const value = series[i]?.[1] ?? 0;
+          return Number.isFinite(value) ? Math.abs(value) : 0;
+        })
+      );
+      score.push([ts, Math.min(100, maxAbs * 10)]);
+    }
+    anomalySeries.value = score;
+  } catch (fallbackErr) {
+    console.error('Local anomaly fallback failed', fallbackErr);
     anomalySeries.value = [];
     starlinkAnomalyEvents.value = [];
   }

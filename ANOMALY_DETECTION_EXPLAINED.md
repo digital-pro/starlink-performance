@@ -202,4 +202,3 @@ The Starlink app is more "alarmist" and flags everything. Your dashboard is more
 The **"Starlink Events"** section of your dashboard (with the emoji markers) is essentially your version of the Starlink app's "anomalies" feed. If you're seeing events there, your system is working perfectly!
 
 If your connection is stable and healthy, **not seeing many anomalies is a GOOD thing!** 🎉
-
