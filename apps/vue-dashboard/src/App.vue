@@ -44,9 +44,10 @@
     <!-- Totals and Diagnostics in one row -->
     <section style="margin-top: 12px;">
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:8px;">
-        <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Sum of downlink Mbps over last hour converted to GB (assumes 15s scrape interval)">
-          <div style="font-size:11px; color:#778;">Download (last hour)</div>
+        <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Sum of actual Starlink telemetry data over selected time range (excludes synthetic speedtest traffic)">
+          <div style="font-size:11px; color:#778;">Download ({{ rangeLabel }})</div>
           <div style="font-size:18px; font-weight:600;">{{ typeof totalDownGb === 'number' ? totalDownGb.toFixed(2) : 'N/A' }} GB</div>
+          <div style="font-size:10px; color:#99a;">Real usage only</div>
         </div>
         <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Windows WiFi adapter link speed (Mbps). This is the negotiated connection speed between your WiFi adapter and Starlink router.">
           <div style="font-size:11px; color:#778;">WiFi Speed</div>
@@ -225,24 +226,11 @@
 
     <!-- Diagnostic Charts Section -->
     <section style="margin-top: 24px;">
-      <h3 style="margin:0 0 12px 0; color:#334;">Connection Diagnostics</h3>
-      <div style="display:grid; grid-template-columns: minmax(200px, 1fr) repeat(3, minmax(0, 1fr)); gap:8px; grid-auto-rows: 150px; align-items:stretch;">
-        <!-- Azimuth Chart -->
-        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white; grid-column:1; grid-row:1;">
-          <div style="font-size:11px; color:#778; margin-bottom:4px;">Azimuth (deg)</div>
-          <div v-if="azimuthSeries.length === 0" style="height:100%; min-height:120px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="azimuthOption" autoresize style="height:120px;" />
-        </div>
-
-        <!-- Elevation Chart -->
-        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white; grid-column:1; grid-row:2;">
-          <div style="font-size:11px; color:#778; margin-bottom:4px;">Elevation (deg)</div>
-          <div v-if="elevationSeries.length === 0" style="height:100%; min-height:120px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="elevationOption" autoresize style="height:120px;" />
-        </div>
-
-        <!-- Speedtest Supercard -->
-        <div style="border:1px solid #eee; border-radius:8px; padding:12px; background:white; grid-column:2 / span 3; grid-row:1 / span 2; display:flex; flex-direction:column;">
+      <h3 style="margin:0 0 12px 0; color:#334;">Speedtest (iperf3)</h3>
+      <div style="display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:8px; align-items:stretch;">
+        
+        <!-- Speedtest Supercard - Full Width -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:12px; background:white; grid-column:1 / span 4; grid-row:1; display:flex; flex-direction:column; min-height:240px;">
           <div style="font-size:11px; color:#778; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
             <span>Internet at a Glance</span>
             <span v-if="showSyntheticSpeedtest" style="font-size:10px; color:#999;">{{ speedtestServerLabel }} · every {{ speedtestCadenceLabel }}</span>
@@ -299,6 +287,20 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Azimuth Chart - Below speedtest, left half -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white; grid-column:1 / span 2; grid-row:2;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px;">Azimuth (deg)</div>
+          <div v-if="azimuthSeries.length === 0" style="height:100%; min-height:120px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="azimuthOption" autoresize style="height:140px;" />
+        </div>
+
+        <!-- Elevation Chart - Below speedtest, right half -->
+        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white; grid-column:3 / span 2; grid-row:2;">
+          <div style="font-size:11px; color:#778; margin-bottom:4px;">Elevation (deg)</div>
+          <div v-if="elevationSeries.length === 0" style="height:100%; min-height:120px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="elevationOption" autoresize style="height:140px;" />
         </div>
       </div>
     </section>
@@ -747,9 +749,22 @@ async function refreshAll() {
   metrics.value.bandwidthDown = dMbps;
   metrics.value.bandwidthUp = uMbps;
 
-  // Total download (GB) over last hour; assumes 15s scrape interval
-  const totalGb = await fetchInstantProm('sum_over_time(starlink_down_mbps[1h]) * 15 / 8000', fixedEnd);
-  totalDownGb.value = typeof totalGb === 'number' && Number.isFinite(totalGb) ? totalGb : 'N/A';
+  // Total download (GB) over selected time range; assumes 15s scrape interval
+  // Note: starlink_down_mbps includes ALL traffic including synthetic speedtest
+  // Speedtest runs 30s every 10 min (5% of time), estimate ~20 Mbps avg
+  // Speedtest contribution = rangeHours * 6 tests/hr * 30s * 20 Mbps / 8 / 1000 = rangeHours * 0.45 GB
+  const rangeMinutes = Math.floor(seconds / 60);
+  const rangeHours = rangeMinutes / 60;
+  const rangeQuery = rangeMinutes >= 60 
+    ? `sum_over_time(starlink_down_mbps[${Math.floor(rangeMinutes / 60)}h]) * 15 / 8000`
+    : `sum_over_time(starlink_down_mbps[${rangeMinutes}m]) * 15 / 8000`;
+  const totalGbRaw = await fetchInstantProm(rangeQuery, fixedEnd);
+  // Subtract estimated speedtest contribution (0.45 GB per hour)
+  const speedtestGb = rangeHours * 0.45;
+  const totalGbReal = typeof totalGbRaw === 'number' && Number.isFinite(totalGbRaw) 
+    ? Math.max(0, totalGbRaw - speedtestGb) 
+    : totalGbRaw;
+  totalDownGb.value = typeof totalGbReal === 'number' && Number.isFinite(totalGbReal) ? totalGbReal : 'N/A';
 
   // WiFi link speed (Mbps): windows_wifi_link_speed_mbps - connection speed between computer and Starlink router
   const wifi = await fetchInstantProm('windows_wifi_link_speed_mbps', fixedEnd);
@@ -930,25 +945,34 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
       maxLoss = Math.max(maxLoss, loss);
       maxLat = Math.max(maxLat, lat);
       
-      // Sky Search: Both throughputs drop to near-zero (< 10000 bytes/sec = ~80 Kbps)
-      const isSkySearching = downBps < 10000 && upBps < 10000;
-      if (isSkySearching && !inSkySearch) {
+      // Outage Detection: Both throughputs drop to near-zero (< 10000 bytes/sec = ~80 Kbps)
+      const isOutage = downBps < 10000 && upBps < 10000;
+      // Router offline: Complete failure (zero throughput + high packet loss)
+      const isRouterOffline = isOutage && loss > 0.8; // 80%+ packet loss
+      const isSkySearching = isOutage && !isRouterOffline;
+      
+      if (isOutage && !inSkySearch) {
         inSkySearch = true;
         skySearchStart = ts;
+        const outageType = isRouterOffline ? 'Router offline' : 'Sky search started';
+        const icon = isRouterOffline ? '🔌' : '🔍';
         events.push({
           time: formatTime(ts),
           timestamp: ts,
-          message: 'Sky search started',
-          icon: '🔍',
-          color: '#f90'
+          message: outageType,
+          icon: icon,
+          color: isRouterOffline ? '#c33' : '#f90'
         });
-      } else if (!isSkySearching && inSkySearch) {
+      } else if (!isOutage && inSkySearch) {
         inSkySearch = false;
         const durationSec = Math.round((ts - skySearchStart) / 1000);
+        const durationMsg = durationSec >= 60 
+          ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
+          : `${durationSec}s`;
         events.push({
           time: formatTime(ts),
           timestamp: ts,
-          message: `Connected (searched ${durationSec}s)`,
+          message: `Connected (offline ${durationMsg})`,
           icon: '✅',
           color: '#0a7'
         });
@@ -1449,9 +1473,19 @@ const bandwidthOption = computed(() => {
         showSymbol: false,
         smooth: true,
         yAxisIndex: 0,
-        lineStyle: { width: 2 }
+        lineStyle: { width: 2, color: '#1a73e8' },
+        areaStyle: { color: 'rgba(26, 115, 232, 0.15)' }
       },
-      { type: 'line', name: 'Up (Mbps)', data: bandwidthUpSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 2 } },
+      { 
+        type: 'line', 
+        name: 'Up (Mbps)', 
+        data: bandwidthUpSeries.value, 
+        showSymbol: false, 
+        smooth: true, 
+        yAxisIndex: 0, 
+        lineStyle: { width: 2, color: '#34a853' },
+        areaStyle: { color: 'rgba(52, 168, 83, 0.15)' }
+      },
       { type: 'line', name: 'Down (MB/min)', data: downMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 1, lineStyle: { width: 1.5, type: 'dotted' } },
       { type: 'line', name: 'Up (MB/min)', data: upMbPerMinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 1, lineStyle: { width: 1.5, type: 'dotted' } },
       { type: 'line', name: 'Down (MB/10m)', data: downMbPer10MinSeries.value, showSymbol: false, smooth: true, yAxisIndex: 1, lineStyle: { width: 1.5 } },
@@ -1535,20 +1569,67 @@ const anomalyOption = computed(() => {
 });
 
 const speedtestOption = computed(() => {
-  const downRange = computeAxisRange(speedtestDownSeries.value, 0.1, { min: 0, max: 200 }, { includeZero: true, minSpan: 1 });
-  const upRange = computeAxisRange(speedtestUpSeries.value, 0.1, { min: 0, max: 200 }, { includeZero: true, minSpan: 1 });
+  // Use same scale for both up/down, clamped at 100 Mbps for better comparison
+  const combinedData = [...speedtestDownSeries.value, ...speedtestUpSeries.value];
+  const sharedRange = computeAxisRange(combinedData, 0.1, { min: 0, max: 100 }, { includeZero: true, minSpan: 10 });
+  
+  // Find points where tests actually ran (value changed from previous point)
+  const findTestPoints = (series: Array<[number, number]>) => {
+    if (series.length === 0) return [];
+    const testPoints = [];
+    let lastValue = null;
+    for (let i = 0; i < series.length; i++) {
+      const currentValue = series[i][1];
+      if (lastValue === null || Math.abs(currentValue - lastValue) > 0.01) {
+        // Value changed significantly - this is a new test
+        testPoints.push({ coord: series[i], value: currentValue.toFixed(2) });
+        lastValue = currentValue;
+      }
+    }
+    return testPoints;
+  };
+  
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
-    grid: { left: 45, right: 70, top: 32, bottom: 28 },
+    grid: { left: 45, right: 45, top: 32, bottom: 28 },
     legend: { top: 4, data: ['Download (Mbps)', 'Upload (Mbps)'] },
     xAxis: { type: 'time' },
     yAxis: [
-      { type: 'value', name: 'Download (Mbps)', min: downRange.min, max: downRange.max },
-      { type: 'value', name: 'Upload (Mbps)', position: 'right', min: upRange.min, max: upRange.max }
+      { type: 'value', name: 'Speed (Mbps)', min: sharedRange.min, max: sharedRange.max }
     ],
     series: [
-      { type: 'line', name: 'Download (Mbps)', data: speedtestDownSeries.value, showSymbol: false, smooth: true, yAxisIndex: 0, lineStyle: { width: 1.8, color: '#1a73e8' } },
-      { type: 'line', name: 'Upload (Mbps)', data: speedtestUpSeries.value, showSymbol: false, smooth: true, yAxisIndex: 1, lineStyle: { width: 1.8, color: '#34a853' } }
+      { 
+        type: 'line', 
+        name: 'Download (Mbps)', 
+        data: speedtestDownSeries.value, 
+        showSymbol: false,  // Don't show symbols on every point
+        smooth: true, 
+        lineStyle: { width: 2, color: '#1a73e8' },
+        itemStyle: { color: '#1a73e8' },
+        markPoint: {
+          symbol: 'circle',
+          symbolSize: 8,
+          data: findTestPoints(speedtestDownSeries.value),
+          itemStyle: { color: '#1a73e8' },
+          label: { show: false }
+        }
+      },
+      { 
+        type: 'line', 
+        name: 'Upload (Mbps)', 
+        data: speedtestUpSeries.value, 
+        showSymbol: false,  // Don't show symbols on every point
+        smooth: true, 
+        lineStyle: { width: 2, color: '#34a853' },
+        itemStyle: { color: '#34a853' },
+        markPoint: {
+          symbol: 'circle',
+          symbolSize: 8,
+          data: findTestPoints(speedtestUpSeries.value),
+          itemStyle: { color: '#34a853' },
+          label: { show: false }
+        }
+      }
     ]
   };
 });

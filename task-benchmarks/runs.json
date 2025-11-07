@@ -1314,5 +1314,89 @@
     "finishPT": "12:17 PT",
     "start": 1762113827926,
     "end": 1762114622533
+  },
+  {
+    "task": "intro",
+    "spec": "cypress/e2e/intro.cy.js",
+    "timestamp": "2025-11-07T15:50:18.822Z",
+    "finishedAt": "2025-11-07T15:50:35.050Z",
+    "status": "failed",
+    "real": "0m16.228s",
+    "realSeconds": 16.228,
+    "cypressDurationMs": 4930,
+    "totals": {
+      "tests": 1,
+      "passes": 0,
+      "failures": 1,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "07:50 PT",
+    "finishPT": "07:50 PT",
+    "start": 1762530618822,
+    "end": 1762530635050
+  },
+  {
+    "task": "theory-of-mind",
+    "spec": "cypress/e2e/theory_of_mind.cy.js",
+    "timestamp": "2025-11-07T16:07:39.124Z",
+    "finishedAt": "2025-11-07T16:07:50.100Z",
+    "status": "failed",
+    "real": "0m10.976s",
+    "realSeconds": 10.976,
+    "cypressDurationMs": 4036,
+    "totals": {
+      "tests": 1,
+      "passes": 0,
+      "failures": 1,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "08:07 PT",
+    "finishPT": "08:07 PT",
+    "start": 1762531659124,
+    "end": 1762531670100
+  },
+  {
+    "task": "theory-of-mind",
+    "spec": "cypress/e2e/theory_of_mind.cy.js",
+    "timestamp": "2025-11-07T16:23:41.496Z",
+    "finishedAt": "2025-11-07T16:33:52.049Z",
+    "status": "failed",
+    "real": "10m10.553s",
+    "realSeconds": 610.553,
+    "cypressDurationMs": 602952,
+    "totals": {
+      "tests": 1,
+      "passes": 0,
+      "failures": 1,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "08:23 PT",
+    "finishPT": "08:33 PT",
+    "start": 1762532621496,
+    "end": 1762533232049
+  },
+  {
+    "task": "theory-of-mind",
+    "spec": "cypress/e2e/theory_of_mind.cy.js",
+    "timestamp": "2025-11-07T16:48:45.701Z",
+    "finishedAt": "2025-11-07T16:58:54.680Z",
+    "status": "failed",
+    "real": "10m8.979s",
+    "realSeconds": 608.979,
+    "cypressDurationMs": 602532,
+    "totals": {
+      "tests": 1,
+      "passes": 0,
+      "failures": 1,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "08:48 PT",
+    "finishPT": "08:58 PT",
+    "start": 1762534125701,
+    "end": 1762534734680
   }
 ]
