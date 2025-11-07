@@ -546,8 +546,8 @@ Steps:
    SPEEDTEST_BINARY=${SPEEDTEST_BINARY:-/usr/bin/iperf3} \
    SPEEDTEST_SERVER=cardinalphoto.com \
    SPEEDTEST_PORT=5201 \
-   SPEEDTEST_INTERVAL_SECONDS=900 \
+   SPEEDTEST_INTERVAL_SECONDS=300 \
    SPEEDTEST_EXPORTER_PORT=9820 \
    npm run speedtest:exporter
    ```
-   Optional env vars: `SPEEDTEST_PORT`, `SPEEDTEST_DURATION_SECONDS`, `SPEEDTEST_ADDITIONAL_ARGS`, `SPEEDTEST_BINARY` (path to `iperf3`). Update cadence in the dashboard Settings (⚙) to keep labels aligned with whatever interval you configure here. If you fall back to public endpoints, pick one of the alternatives in the dropdown (`iperf.eenet.ee`, `ping.online.net:5202`, etc.).
+   Optional env vars: `SPEEDTEST_PORT`, `SPEEDTEST_DURATION_SECONDS`, `SPEEDTEST_ADDITIONAL_ARGS`, `SPEEDTEST_BINARY` (path to `iperf3`). Update cadence in the dashboard Settings (⚙) to keep labels aligned with whatever interval you configure here. Defaults are now every **5 minutes** (300 s). If you fall back to public endpoints, pick one of the alternatives in the dropdown (`iperf.eenet.ee`, `ping.online.net:5202`, etc.).

@@ -428,7 +428,7 @@ const speedtestSettings = ref<{ server: string; intervalMinutes: number }>({
   server: storedSpeedtestServer && speedtestServerOptions.some((opt) => opt.value === storedSpeedtestServer)
     ? storedSpeedtestServer
     : speedtestServerOptions[0].value,
-  intervalMinutes: readNumberSetting('starlink_speedtest_interval_minutes', 15)
+  intervalMinutes: readNumberSetting('starlink_speedtest_interval_minutes', 5)
 });
 
 
@@ -754,6 +754,16 @@ async function refreshAll() {
   // WiFi link speed (Mbps): windows_wifi_link_speed_mbps - connection speed between computer and Starlink router
   const wifi = await fetchInstantProm('windows_wifi_link_speed_mbps', fixedEnd);
   nicSpeedMbps.value = typeof wifi === 'number' && Number.isFinite(wifi) ? wifi : 'N/A';
+
+  // Speedtest metrics (iperf3)
+  const [speedDown, speedUp, speedTimestamp] = await Promise.all([
+    fetchInstantProm('starlink_speedtest_download_mbps', fixedEnd),
+    fetchInstantProm('starlink_speedtest_upload_mbps', fixedEnd),
+    fetchInstantProm('starlink_speedtest_last_success_timestamp_seconds', fixedEnd)
+  ]);
+  metrics.value.speedtestDown = typeof speedDown === 'number' && Number.isFinite(speedDown) ? speedDown : 'N/A';
+  metrics.value.speedtestUp = typeof speedUp === 'number' && Number.isFinite(speedUp) ? speedUp : 'N/A';
+  metrics.value.speedtestUpdated = typeof speedTimestamp === 'number' && Number.isFinite(speedTimestamp) ? speedTimestamp * 1000 : 'N/A';
 
   // GPS location
   const [gpsLat, gpsLon] = await Promise.all([
