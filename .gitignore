@@ -4,6 +4,7 @@ node_modules/
 .DS_Store
 npm-debug.log*
 .vercel/
+netdata-ml-env/
 public/
 apps/*/dist/
 
@@ -26,3 +27,4 @@ deployment/prom-wsl.yml
 .vercel
 logs/
 *.log
+.venv/

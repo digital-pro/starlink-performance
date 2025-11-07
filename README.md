@@ -310,6 +310,24 @@ go build -o ../logs/starlink_exporter ./cmd/starlink_exporter
 npm run restart:exporter  # Restart with new binary
 ```
 
+#### Local anomaly analysis (WSL-friendly)
+
+The Netdata ML plugin has proven unreliable under WSL, so the repository now ships a Python helper that fetches Starlink metrics from Netdata and performs anomaly detection locally:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Analyse the last hour of throughput/latency/loss data
+python scripts/starlink_anomalies.py --window 3600 --points 360
+
+# JSON output (suitable for further processing)
+python scripts/starlink_anomalies.py --window 7200 --points 720 --json > anomalies.json
+```
+
+The same detection logic powers `/api/starlink-anomalies`, which the dashboard now uses to populate the “Anomaly Detection & Starlink Events” panel.
+
 ### WiFi Link Speed Exporter (WSL2)
 
 The dashboard displays Windows WiFi adapter link speed via a custom Node.js exporter:
@@ -523,12 +541,13 @@ Steps:
    make install
    export SPEEDTEST_BINARY="$(pwd)/build/bin/iperf3"
    ```
-2. **Launch the exporter** – defaults to `iperf.eenet.ee` every 15 minutes. Override as needed.
+2. **Launch the exporter** – defaults to your private `cardinalphoto.com:5201` endpoint every 15 minutes. Override as needed.
    ```bash
    SPEEDTEST_BINARY=${SPEEDTEST_BINARY:-/usr/bin/iperf3} \
-   SPEEDTEST_SERVER=iperf.eenet.ee \
+   SPEEDTEST_SERVER=cardinalphoto.com \
+   SPEEDTEST_PORT=5201 \
    SPEEDTEST_INTERVAL_SECONDS=900 \
    SPEEDTEST_EXPORTER_PORT=9820 \
    npm run speedtest:exporter
    ```
-   Optional env vars: `SPEEDTEST_PORT`, `SPEEDTEST_DURATION_SECONDS`, `SPEEDTEST_ADDITIONAL_ARGS`, `SPEEDTEST_BINARY` (path to `iperf3`). Update cadence in the dashboard Settings (⚙) to keep labels aligned with whatever interval you configure here. If a public endpoint blocks your network, try one of the alternatives in the dropdown (`ping.online.net:5202` is currently the most reliable from the helper box).
+   Optional env vars: `SPEEDTEST_PORT`, `SPEEDTEST_DURATION_SECONDS`, `SPEEDTEST_ADDITIONAL_ARGS`, `SPEEDTEST_BINARY` (path to `iperf3`). Update cadence in the dashboard Settings (⚙) to keep labels aligned with whatever interval you configure here. If you fall back to public endpoints, pick one of the alternatives in the dropdown (`iperf.eenet.ee`, `ping.online.net:5202`, etc.).

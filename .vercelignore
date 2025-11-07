@@ -1,0 +1,6 @@
+.venv/
+netdata/
+netdata-ml-env/
+logs/
+*.log
+

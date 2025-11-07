@@ -182,21 +182,13 @@
         </div>
         <div style="padding:18px 20px; display:flex; flex-direction:column; gap:18px;">
           <section>
-            <h4 style="margin:0 0 8px 0; font-size:14px; color:#334;">Baseline traffic offsets</h4>
-            <p style="margin:0 0 12px 0; font-size:12px; color:#667;">Subtracted from benchmark calculations to estimate pure task usage.</p>
-            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+            <h4 style="margin:0 0 8px 0; font-size:14px; color:#334;">Logging interval</h4>
+            <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
               <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
-                <span>Baseline Down (Mbps)</span>
-                <input v-model.number="baselineDownMbps" type="number" step="0.1" min="0" style="width:120px; padding:6px 8px; border:1px solid #ccd; border-radius:6px; text-align:right;" />
-              </label>
-              <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
-                <span>Baseline Up (Mbps)</span>
-                <input v-model.number="baselineUpMbps" type="number" step="0.1" min="0" style="width:120px; padding:6px 8px; border:1px solid #ccd; border-radius:6px; text-align:right;" />
-              </label>
-              <label style="display:flex; flex-direction:column; gap:6px; font-size:12px; color:#445;">
-                <span>Logging interval (s)</span>
+                <span>Logging cadence (seconds)</span>
                 <input v-model.number="loggingIntervalSeconds" type="number" min="5" step="5" style="width:120px; padding:6px 8px; border:1px solid #ccd; border-radius:6px; text-align:right;" />
               </label>
+              <span style="font-size:12px; color:#667; max-width:320px;">Controls how often the local session notes logger writes to disk. Does not affect Prometheus scrape cadence.</span>
             </div>
           </section>
 
@@ -260,9 +252,33 @@
           <div v-if="showSyntheticSpeedtest" style="flex:1; min-height:240px;">
             <v-chart :option="speedtestOption" autoresize style="height:100%;" />
           </div>
-          <div v-else-if="hasFallbackSpeedData" style="flex:1; min-height:240px;">
-            <v-chart :option="speedtestFallbackOption" autoresize style="height:100%;" />
-            <div style="margin-top:6px; font-size:10px; color:#8896af;">Tip: synthetic speedtests are disabled or failing. Showing rolling Prometheus throughput instead.</div>
+          <div v-else-if="hasFallbackSpeedData" style="flex:1; min-height:240px; display:flex; flex-direction:column; justify-content:center; gap:14px; color:#445;">
+            <div style="font-size:11px; color:#8896af;">
+              Synthetic iPerf tests are unavailable, so this card summarizes the live Starlink telemetry already charted above.
+              Run the helper box speedtest exporter to restore synthetic results.
+            </div>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px; font-size:12px;">
+              <div style="padding:10px; border:1px solid #f0f2f5; border-radius:8px; background:#fafbfd;">
+                <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Current download</div>
+                <div style="font-size:18px; font-weight:600; color:#1a73e8;">{{ formatSpeedMetric(fallbackDownInstant) }}</div>
+                <div style="font-size:11px; color:#8896af;">{{ fallbackDownInstant !== null ? 'from telemetry' : 'waiting for samples' }}</div>
+              </div>
+              <div style="padding:10px; border:1px solid #f0f2f5; border-radius:8px; background:#fafbfd;">
+                <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Current upload</div>
+                <div style="font-size:18px; font-weight:600; color:#34a853;">{{ formatSpeedMetric(fallbackUpInstant) }}</div>
+                <div style="font-size:11px; color:#8896af;">{{ fallbackUpInstant !== null ? 'from telemetry' : 'waiting for samples' }}</div>
+              </div>
+              <div style="padding:10px; border:1px solid #f0f2f5; border-radius:8px; background:#fafbfd;">
+                <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Last minute data</div>
+                <div style="font-size:15px; font-weight:600;">↓ {{ formatMegabytes(fallbackDownMbPerMin) }} · ↑ {{ formatMegabytes(fallbackUpMbPerMin) }}</div>
+                <div style="font-size:11px; color:#8896af;">MB transferred in the most recent minute</div>
+              </div>
+              <div style="padding:10px; border:1px solid #f0f2f5; border-radius:8px; background:#fafbfd;">
+                <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Last 10 minutes</div>
+                <div style="font-size:15px; font-weight:600;">↓ {{ formatMegabytes(fallbackDownMbPer10m) }} · ↑ {{ formatMegabytes(fallbackUpMbPer10m) }}</div>
+                <div style="font-size:11px; color:#8896af;">Telemetered throughput (MB / 10 min)</div>
+              </div>
+            </div>
           </div>
           <div v-else style="flex:1; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px; text-align:center; padding:0 16px;">
             Waiting for metrics. Ensure the iPerf exporter is running on the helper box.
@@ -283,15 +299,6 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div v-if="firstSlotSeries.length > 0" style="margin-top:16px; display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:8px;">
-        <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white;">
-          <div style="font-size:11px; color:#778; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
-            <span>First Slot (s)</span>
-          </div>
-          <v-chart :option="firstSlotOption" autoresize style="height:120px;" />
         </div>
       </div>
     </section>
@@ -386,8 +393,6 @@ const rangeSeconds = ref<number>((Number.isFinite(defaultRangeSeconds) && defaul
 const rangeShiftMinutes = ref<number>(readNumberSetting('starlink_range_shift_minutes', 0));
 const loggingIntervalSeconds = ref<number>(readNumberSetting('starlink_logging_interval_seconds', 60));
 
-const baselineDownMbps = ref<number>(readNumberSetting('starlink_baseline_down', 0.3));
-const baselineUpMbps = ref<number>(readNumberSetting('starlink_baseline_up', 0.3));
 const rangeLabel = computed(() => (
   rangeSeconds.value === 600 ? '10 min' :
   rangeSeconds.value === 3600 ? '1 hour' :
@@ -409,6 +414,7 @@ const lossStats = ref({
 });
 
 const speedtestServerOptions = [
+  { label: 'Cardinal Photo (Los Angeles, US)', value: 'cardinalphoto.com' },
   { label: 'EENet (Tallinn, Estonia)', value: 'iperf.eenet.ee' },
   { label: 'Bouygues Telecom (Paris, France)', value: 'iperf.bouygues.net' },
   { label: 'Serverius (Amsterdam, NL)', value: 'speedtest.serverius.net' },
@@ -455,12 +461,23 @@ const formatTooltipValue = (value: number | string): string => {
   return num.toExponential(2);
 };
 
-function formatSpeedMetric(value: number | string): string {
+function formatSpeedMetric(value: number | string | null | undefined): string {
+  if (value === null || value === undefined) return 'N/A';
+  if (typeof value !== 'number' && typeof value !== 'string') return 'N/A';
   const num = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(num)) return 'N/A';
   if (Math.abs(num) >= 100) return `${num.toFixed(0)} Mbps`;
   if (Math.abs(num) >= 10) return `${num.toFixed(1)} Mbps`;
   return `${num.toFixed(2)} Mbps`;
+}
+
+function formatMegabytes(value: number | null | undefined): string {
+  if (value === null || value === undefined) return 'N/A';
+  if (!Number.isFinite(value)) return 'N/A';
+  const abs = Math.abs(value);
+  if (abs >= 1024) return `${(value / 1024).toFixed(1)} GB`;
+  if (abs >= 10) return `${value.toFixed(1)} MB`;
+  return `${value.toFixed(2)} MB`;
 }
 
 function formatRelativeTimestamp(value: number | string): string {
@@ -478,6 +495,17 @@ function formatRelativeTimestamp(value: number | string): string {
   }
   const days = Math.floor(hours / 24);
   return days === 1 ? '1 day ago' : `${days} days ago`;
+}
+
+function formatLocalTimeShort(ts: number): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(new Date(ts));
 }
 
 function formatGpsLocation(): string {
@@ -600,16 +628,10 @@ async function computeRunMb(run: { start: number; end: number }) {
   const rawDown = integrateThroughputToMb(downSeries);
   const rawUp = integrateThroughputToMb(upSeries);
   
-  // Subtract baseline traffic (baseline is in Mbps, convert to MB over duration)
-  const baselineMbDown = (baselineDownMbps.value * seconds) / 8; // Mbps * seconds / 8 = MB
-  const baselineMbUp = (baselineUpMbps.value * seconds) / 8;
-  
-  const mbDown = Math.max(0, Number((rawDown - baselineMbDown).toFixed(2)));
-  const mbUp = Math.max(0, Number((rawUp - baselineMbUp).toFixed(2)));
-  
-  console.log(`📊 MB calc for ${seconds}s: Down ${rawDown.toFixed(2)}MB - ${baselineMbDown.toFixed(2)}MB baseline = ${mbDown}MB | Up ${rawUp.toFixed(2)}MB - ${baselineMbUp.toFixed(2)}MB baseline = ${mbUp}MB`);
-  
-  return { mbDown, mbUp };
+  return {
+    mbDown: Number(rawDown.toFixed(2)),
+    mbUp: Number(rawUp.toFixed(2))
+  };
 }
 
 async function enrichVisibleRunsWithMb() {
@@ -655,8 +677,8 @@ async function loadBenchRuns() {
 
     // Debug: print PT time for each mark line and whether it's in current range
     try {
-      const fmt = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/Los_Angeles', year: '2-digit', month: '2-digit', day: '2-digit',
+      const fmt = new Intl.DateTimeFormat(undefined, {
+        year: '2-digit', month: '2-digit', day: '2-digit',
         hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
       });
       const now = Date.now() - (rangeShiftMinutes.value * 60 * 1000);
@@ -768,9 +790,7 @@ async function refreshAll() {
   downMbPer10MinSeries.value = clampSeriesPercentile(downMB10, 0.95, 1.3, 30000);
   upMbPer10MinSeries.value = clampSeriesPercentile(upMB10, 0.95, 1.3, 30000);
 
-  // Anomaly detection
-  anomalySeries.value = await fetchRangeProm('netdata_anomaly_detection_anomaly_rate_percentage_average', seconds, step, fixedEnd);
-  console.log(`📊 Anomaly series: ${anomalySeries.value.length} data points`);
+  await loadStarlinkAnomalyScore(seconds, step);
 
   // Diagnostic charts
   const [azimuth, elevation, firstSlot] = await Promise.all([
@@ -814,6 +834,42 @@ async function refreshAll() {
   await loadStarlinkEvents(seconds, 30, fixedEnd);
 }
 
+async function loadStarlinkAnomalyScore(seconds: number, step: number) {
+  try {
+    const pointsGuess = Math.max(120, Math.min(1800, Math.ceil(seconds / Math.max(step, 10))));
+    const res = await axios.get('/api/starlink-anomalies', {
+      params: {
+        seconds,
+        points: pointsGuess,
+        threshold: 3.5,
+        window: Math.max(20, Math.floor(pointsGuess * 0.1)),
+      }
+    });
+    const data = res.data ?? {};
+    const score = data?.score ?? {};
+    if (Array.isArray(score.timestamps) && Array.isArray(score.values)) {
+      anomalySeries.value = score.timestamps.map((ts: number, idx: number) => [ts, Number(score.values[idx] ?? 0)]);
+    } else {
+      anomalySeries.value = [];
+    }
+    if (Array.isArray(data?.events)) {
+      starlinkAnomalyEvents.value = data.events.map((event: any) => ({
+        metric: event.metric || 'metric',
+        timestamp: Number(event.timestamp ?? 0),
+        iso: typeof event.iso === 'string' ? event.iso : new Date(Number(event.timestamp ?? 0)).toISOString(),
+        value: Number(event.value ?? 0),
+        zscore: Number(event.zscore ?? 0)
+      }));
+    } else {
+      starlinkAnomalyEvents.value = [];
+    }
+  } catch (err) {
+    console.error('Failed to fetch starlink anomalies', err);
+    anomalySeries.value = [];
+    starlinkAnomalyEvents.value = [];
+  }
+}
+
 async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: number) {
   const events: Array<{ time: string; timestamp: number; message: string; icon: string; color: string }> = [];
   
@@ -838,8 +894,7 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
     let obstructionStart = 0;
     let networkIssueStart = 0;
     
-    const formatTime = (ts: number) => new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Los_Angeles',
+    const formatTime = (ts: number) => new Intl.DateTimeFormat(undefined, {
       month: 'short', day: 'numeric',
       hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
     }).format(new Date(ts));
@@ -1065,6 +1120,7 @@ const speedtestDownSeries = ref<Array<[number, number]>>([]);
 const speedtestUpSeries = ref<Array<[number, number]>>([]);
 const benchRuns = ref<Array<{ task: string; start: number; end: number }>>([]);
 const anomalySeries = ref<Array<[number, number]>>([]);
+const starlinkAnomalyEvents = ref<Array<{ metric: string; timestamp: number; iso: string; value: number; zscore: number }>>([]);
 const starlinkEvents = ref<Array<{ time: string; timestamp: number; message: string; icon: string; color: string }>>([]);
 
 // Diagnostic charts series
@@ -1139,6 +1195,13 @@ const displayUploadMbps = computed<number | null>(() => {
   return fallback !== null ? fallback : null;
 });
 
+const fallbackDownInstant = computed<number | null>(() => latestFromSeries(bandwidthDownSeries.value));
+const fallbackUpInstant = computed<number | null>(() => latestFromSeries(bandwidthUpSeries.value));
+const fallbackDownMbPerMin = computed<number | null>(() => latestFromSeries(downMbPerMinSeries.value));
+const fallbackUpMbPerMin = computed<number | null>(() => latestFromSeries(upMbPerMinSeries.value));
+const fallbackDownMbPer10m = computed<number | null>(() => latestFromSeries(downMbPer10MinSeries.value));
+const fallbackUpMbPer10m = computed<number | null>(() => latestFromSeries(upMbPer10MinSeries.value));
+
 const latencySeriesProcessed = computed(() => {
   const original = latencySeries.value;
   if (!Array.isArray(original) || original.length === 0) {
@@ -1195,16 +1258,13 @@ const latencyOption = computed(() => {
     .flatMap(run => {
       const dMb = typeof (run as any).mbDown === 'number' ? Math.trunc((run as any).mbDown) : undefined;
       const uMb = typeof (run as any).mbUp === 'number' ? Math.trunc((run as any).mbUp) : undefined;
-      const startItem: any = { name: `${run.task} ▶\n${new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/Los_Angeles',
+      const startItem: any = { name: `${run.task} ▶\n${new Intl.DateTimeFormat(undefined, {
         hour: '2-digit', minute: '2-digit', hour12: false
       }).format(new Date(run.start))}\n↓${dMb ?? '?'}MB ↑${uMb ?? '?'}MB`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 }, task: run.task, mbDown: dMb, mbUp: uMb, label: { show: false } };
       const endItem: any = { 
-        name: `${run.task} ◼\n${new Intl.DateTimeFormat('en-US', {
-          timeZone: 'America/Los_Angeles',
+        name: `${run.task} ◼\n${new Intl.DateTimeFormat(undefined, {
           hour: '2-digit', minute: '2-digit', hour12: false
-        }).format(new Date(run.start))} - ${new Intl.DateTimeFormat('en-US', {
-          timeZone: 'America/Los_Angeles',
+        }).format(new Date(run.start))} - ${new Intl.DateTimeFormat(undefined, {
           hour: '2-digit', minute: '2-digit', hour12: false
         }).format(new Date(run.end))}\n↓${dMb ?? '?'}MB ↑${uMb ?? '?'}MB`, 
         xAxis: run.end, 
@@ -1242,14 +1302,17 @@ const latencyOption = computed(() => {
     grid: { left: 40, right: 80, top: 64, bottom: 40 },
     legend: { top: 6, data: ['Latency', 'Packet Loss (%)'] },
     xAxis: { 
-    type: 'time',
-    axisLabel: {
-      formatter: (value: number) => new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/Los_Angeles',
-        hour: '2-digit', minute: '2-digit', hour12: false
-      }).format(new Date(value))
-    }
-  },
+      type: 'time',
+      axisLabel: {
+        formatter: (value: number | string) => {
+          const ts = typeof value === 'number' ? value : Number(value);
+          if (!Number.isFinite(ts)) return '';
+          return new Intl.DateTimeFormat(undefined, {
+            hour: '2-digit', minute: '2-digit', hour12: false
+          }).format(new Date(ts));
+        }
+      }
+    },
     yAxis: [
       { type: 'value', name: 'ms' },
       { type: 'value', name: '%', position: 'right', min: packetLossRange.min, max: packetLossRange.max }
@@ -1306,8 +1369,7 @@ const bandwidthOption = computed(() => {
     .flatMap(run => {
       const dMb = typeof (run as any).mbDown === 'number' ? Math.trunc((run as any).mbDown) : undefined;
       const uMb = typeof (run as any).mbUp === 'number' ? Math.trunc((run as any).mbUp) : undefined;
-      const formatTime = (ts: number) => new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/Los_Angeles',
+      const formatTime = (ts: number) => new Intl.DateTimeFormat(undefined, {
         hour: '2-digit', minute: '2-digit', hour12: false
       }).format(new Date(ts));
       const startItem: any = { name: `${run.task} ▶\n${formatTime(run.start)}\n↓${dMb ?? '?'}MB ↑${uMb ?? '?'}MB`, xAxis: run.start, lineStyle: { color: '#0a7', width: 2 }, task: run.task, mbDown: dMb, mbUp: uMb, label: { show: false } };
@@ -1352,10 +1414,13 @@ const bandwidthOption = computed(() => {
     xAxis: {
       type: 'time',
       axisLabel: {
-        formatter: (value: number) => new Intl.DateTimeFormat('en-US', {
-          timeZone: 'America/Los_Angeles',
-          hour: '2-digit', minute: '2-digit', hour12: false
-        }).format(new Date(value))
+        formatter: (value: number | string) => {
+          const ts = typeof value === 'number' ? value : Number(value);
+          if (!Number.isFinite(ts)) return '';
+          return new Intl.DateTimeFormat(undefined, {
+            hour: '2-digit', minute: '2-digit', hour12: false
+          }).format(new Date(ts));
+        }
       }
     },
     yAxis: [
@@ -1407,34 +1472,50 @@ const bandwidthOption = computed(() => {
 });
 
 const anomalyOption = computed(() => {
-  // Create mark lines for Starlink events
-  const eventMarkLines = starlinkEvents.value.map(event => ({
-    name: event.message,
+  const anomalyMarks = starlinkAnomalyEvents.value.map((event) => ({
+    name: `${event.metric.toUpperCase()}`,
     xAxis: event.timestamp,
-    lineStyle: { color: event.color, width: 2, type: 'dashed' },
-    icon: event.icon,
+    lineStyle: { color: '#d7263d', width: 2, type: 'dashed' },
     label: {
       show: true,
-      formatter: (p: any) => {
-        const ts = typeof p?.data?.xAxis === 'number' ? p.data.xAxis : undefined;
-        const time = typeof ts === 'number' ? new Intl.DateTimeFormat('en-US', {
-          timeZone: 'America/Los_Angeles',
-          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-        }).format(new Date(ts)) : '';
-        return `${event.icon} ${time}`;
-      },
+      formatter: () => `${event.metric.toUpperCase()} z=${event.zscore.toFixed(1)}\n${formatLocalTimeShort(event.timestamp)}`,
       fontSize: 10
     }
   }));
 
+  const heuristicMarks = starlinkEvents.value.map(event => ({
+    name: event.message,
+    xAxis: event.timestamp,
+    lineStyle: { color: event.color, width: 2, type: 'dashed' },
+    label: {
+      show: true,
+      formatter: () => `${event.icon} ${event.message}\n${formatLocalTimeShort(event.timestamp)}`,
+      fontSize: 10
+    }
+  }));
+
+  const eventMarkLines = [...anomalyMarks, ...heuristicMarks];
+
   return {
     tooltip: { trigger: 'axis', valueFormatter: formatTooltipValue },
     grid: { left: 40, right: 80, top: 48, bottom: 24 },
-    legend: { top: 4, data: ['Anomaly Rate (%)'] },
-    xAxis: { type: 'time' },
-    yAxis: { type: 'value', name: '%', min: 0, max: 100 },
+    legend: { top: 4, data: ['Anomaly Score'] },
+    xAxis: {
+      type: 'time',
+      axisLabel: { color: '#667' },
+      axisLine: { lineStyle: { color: '#d2d7e5' } },
+      axisTick: { lineStyle: { color: '#d2d7e5' } }
+    },
+    yAxis: {
+      type: 'value',
+      name: 'Anomaly Score',
+      nameLocation: 'middle',
+      nameGap: 45,
+      min: 0,
+      max: 100
+    },
     series: [
-      { type: 'line', name: 'Anomaly Rate (%)', data: anomalySeries.value, showSymbol: false, lineStyle: { width: 1.5 } }
+      { type: 'line', name: 'Anomaly Score', data: anomalySeries.value, showSymbol: false, lineStyle: { width: 1.5 } }
     ],
     markLine: eventMarkLines.length > 0 ? {
       data: eventMarkLines.map(line => [{ xAxis: line.xAxis, lineStyle: line.lineStyle, label: line.label, name: line.name }]),
@@ -1534,7 +1615,12 @@ const firstSlotOption = computed(() => {
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'cross' }, valueFormatter: formatTooltipValue },
     grid: { left: 35, right: 10, top: 5, bottom: 20 },
-    xAxis: { type: 'time', show: false },
+    xAxis: {
+      type: 'time',
+      axisLabel: { color: '#667' },
+      axisLine: { lineStyle: { color: '#d2d7e5' } },
+      axisTick: { lineStyle: { color: '#d2d7e5' } }
+    },
     yAxis: { type: 'value', name: 's', min: range.min, max: range.max, scale: true },
     series: [{
       type: 'line',
@@ -1598,18 +1684,6 @@ watch(rangeShiftMinutes, (val) => {
   refreshAll();
 });
 
-watch(baselineDownMbps, (val) => {
-  if (isBrowser && typeof val === 'number' && Number.isFinite(val)) {
-    localStorage.setItem('starlink_baseline_down', String(val));
-  }
-});
-
-watch(baselineUpMbps, (val) => {
-  if (isBrowser && typeof val === 'number' && Number.isFinite(val)) {
-    localStorage.setItem('starlink_baseline_up', String(val));
-  }
-});
-
 watch(loggingIntervalSeconds, (val) => {
   if (isBrowser && typeof val === 'number' && Number.isFinite(val) && val > 0) {
     localStorage.setItem('starlink_logging_interval_seconds', String(val));
@@ -1656,3 +1730,4 @@ export default {
 <style>
 html, body, #app { height: 100%; margin: 0; background: #f6f8fb; }
 </style>
+

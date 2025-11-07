@@ -6,7 +6,7 @@ import { promisify } from 'util';
 const execFileAsync = promisify(execFile);
 
 const SPEEDTEST_BINARY = process.env.SPEEDTEST_BINARY || 'iperf3';
-const PRIMARY_SERVER = process.env.SPEEDTEST_SERVER || 'iperf.eenet.ee';
+const PRIMARY_SERVER = process.env.SPEEDTEST_SERVER || 'cardinalphoto.com';
 const PRIMARY_PORT = Number(process.env.SPEEDTEST_PORT || 5201);
 const FALLBACKS = (process.env.SPEEDTEST_SERVER_FALLBACKS || 'ping.online.net:5202,iperf.he.net:5201').split(',').map((s) => s.trim()).filter(Boolean);
 const SERVER_POOL = [

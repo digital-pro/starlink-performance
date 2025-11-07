@@ -57,17 +57,33 @@ async function getStarlinkTarget() {
   return '127.0.0.1:9817';
 }
 
-async function waitForTargets(timeoutMs = 20000) {
+async function waitForTargets({ timeoutMs = 60000, job } = {}) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
       const res = await fetch('http://127.0.0.1:9090/api/v1/targets');
       if (res.ok) {
         const json = await res.json();
-        return json?.data || {};
+        const data = json?.data || {};
+        if (!job) return data;
+        const active = Array.isArray(data.activeTargets) ? data.activeTargets : [];
+        const match = active.find(t => (t?.labels?.job || t?.discoveredLabels?.job) === job);
+        if (match) return data;
       }
-    } catch {}
+    } catch (error) {
+      if ((Date.now() - start) > 3000) {
+        console.log(`...Prometheus not ready yet (${error?.message || error})`);
+      }
+    }
+    const elapsed = Math.round((Date.now() - start) / 1000);
+    if (elapsed > 0 && elapsed % 5 === 0) {
+      const what = job ? `target '${job}'` : 'Prometheus';
+      console.log(`...still waiting for ${what} (elapsed ${elapsed}s)`);
+    }
     await new Promise(r => setTimeout(r, 1000));
+  }
+  if (job) {
+    throw new Error(`Timed out waiting for Prometheus target '${job}'`);
   }
   throw new Error('Timed out waiting for Prometheus targets');
 }
@@ -86,19 +102,31 @@ async function waitForTargets(timeoutMs = 20000) {
     await run(`bash ${dquote(join(repoRoot, 'deployment', 'run-wsl-prom.sh'))} --instance ${instanceId} --starlink ${starlinkTarget} --bg`);
 
     console.log('Waiting for targets...');
-    const data = await waitForTargets();
+    const data = await waitForTargets({ job: 'starlink' });
     const active = Array.isArray(data.activeTargets) ? data.activeTargets : [];
-    const starlink = active.find(t => (t?.labels?.job || t?.discoveredLabels?.job) === 'starlink');
+    let starlink = active.find(t => (t?.labels?.job || t?.discoveredLabels?.job) === 'starlink');
 
-    if (!starlink) {
-      console.log('No starlink target discovered yet. Check prom logs: npm run prom:logs');
-      process.exit(0);
+    const getAddress = target => target?.labels?.instance || target?.discoveredLabels?.__address__ || 'unknown';
+    let health = starlink?.health || 'unknown';
+    const address = getAddress(starlink);
+    console.log(`Starlink target detected: ${address} → initial health=${health}`);
+
+    if (health !== 'up') {
+      const healthTimeout = Date.now() + 30000;
+      while (Date.now() < healthTimeout && health !== 'up') {
+        await new Promise(r => setTimeout(r, 2000));
+        const retryData = await waitForTargets({ timeoutMs: 5000, job: 'starlink' });
+        const retryActive = Array.isArray(retryData.activeTargets) ? retryData.activeTargets : [];
+        starlink = retryActive.find(t => (t?.labels?.job || t?.discoveredLabels?.job) === 'starlink') || starlink;
+        health = starlink?.health || 'unknown';
+        if (health === 'up') break;
+        console.log(`...waiting for exporter to become healthy (current health=${health})`);
+      }
     }
 
-    const health = starlink.health || 'unknown';
-    console.log(`Starlink target: ${starlink.labels?.instance || starlink.discoveredLabels?.__address__} → health=${health}`);
+    console.log(`Starlink target: ${getAddress(starlink)} → health=${health}`);
     if (health !== 'up') {
-      console.log('Exporter is not reachable. Ensure the exporter is running or set STARLINK_TARGET to the correct host:port and rerun.');
+      console.log('Exporter is still not reporting healthy. Ensure the exporter is running or set STARLINK_TARGET to the correct host:port and rerun.');
     } else {
       console.log('Exporter is Up. Remote write to Grafana Cloud should be active.');
     }
