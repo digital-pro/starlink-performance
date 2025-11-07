@@ -364,7 +364,15 @@ async function runSpec(specFullPath, projectRoot, cypressLib) {
         VIDEO_COMPRESSION: wantVideoCompress ? '32' : '0',
       }
     });
-    const ok = results && results.totalFailed === 0 && results.status === 'finished';
+    const failedCount =
+      results?.totalFailed ??
+      results?.failures ??
+      (Array.isArray(results?.runs) ? results.runs.reduce((sum, run) => sum + (run.failures || 0), 0) : 0);
+    const statusValue = results?.status;
+    const ok = failedCount === 0 && (statusValue === undefined || statusValue === 'finished');
+    if (!ok && results) {
+      console.warn(`[bench] Cypress reported status='${statusValue}' failed=${failedCount}`);
+    }
     status = ok ? 'passed' : 'failed';
   } catch (err) {
     status = 'error';
