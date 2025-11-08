@@ -2,7 +2,9 @@ import base64
 import json
 import os
 import time
+from http import HTTPStatus
 from typing import Dict, List
+from urllib.parse import parse_qs
 
 import numpy as np
 import pandas as pd
@@ -188,59 +190,137 @@ def aggregate_score(zscore_frames: List[pd.Series]) -> pd.Series:
     return np.clip(max_score * 10, 0, 100)
 
 
-def handler(request):
-    seconds = int(request.args.get("seconds", "3600"))
-    points = int(request.args.get("points", "360"))
-    threshold = float(request.args.get("threshold", "3.5"))
-    window = int(request.args.get("window", "30"))
+print(
+    "[starlink-anomalies] module import",
+    {
+        "has_prom_url": bool(PROM_URL),
+        "has_basic": bool(PROM_BASIC),
+        "has_bearer": bool(PROM_BEARER),
+        "has_user_token": bool(PROM_USER and PROM_TOKEN),
+        "has_scope": bool(PROM_SCOPE),
+    },
+    flush=True,
+)
 
-    series_payload = {}
-    events_payload = []
-    zscore_frames = []
 
-    for label, chart in STARLINK_CHARTS.items():
-        series = fetch_chart(chart, seconds=seconds, points=points)
-        zscores = robust_zscore(series, window)
-        if not zscores.empty:
-            zscore_frames.append(zscores)
-        anomalies = detect_anomalies(series, window, threshold)
-        series_payload[label] = {
-            "timestamps": [int(ts.value // 10**6) for ts in series.index],
-            "values": [float(v) for v in series.values],
-            "zscores": [float(zscores.get(ts, 0.0)) for ts in series.index],
+def _get_arg(args, key, default):
+    if args is None:
+        return default
+    value = None
+    if hasattr(args, "get"):
+        value = args.get(key)
+        if value is None and hasattr(args, "getlist"):
+            values = args.getlist(key)
+            value = values[0] if values else None
+    elif isinstance(args, dict):
+        value = args.get(key)
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else None
+    if value is None:
+        return default
+    return value
+
+
+def build_response(args):
+    try:
+        seconds = int(_get_arg(args, "seconds", "3600"))
+        points = int(_get_arg(args, "points", "360"))
+        threshold = float(_get_arg(args, "threshold", "3.5"))
+        window = int(_get_arg(args, "window", "30"))
+
+        series_payload = {}
+        events_payload = []
+        zscore_frames = []
+
+        for label, chart in STARLINK_CHARTS.items():
+            series = fetch_chart(chart, seconds=seconds, points=points)
+            zscores = robust_zscore(series, window)
+            if not zscores.empty:
+                zscore_frames.append(zscores)
+            anomalies = detect_anomalies(series, window, threshold)
+            series_payload[label] = {
+                "timestamps": [int(ts.value // 10**6) for ts in series.index],
+                "values": [float(v) for v in series.values],
+                "zscores": [float(zscores.get(ts, 0.0)) for ts in series.index],
+            }
+            for ts, z in anomalies.items():
+                events_payload.append(
+                    {
+                        "metric": label,
+                        "timestamp": int(ts.value // 10**6),
+                        "iso": ts.isoformat(),
+                        "value": float(series.loc[ts]),
+                        "zscore": float(z),
+                    }
+                )
+
+        combined = aggregate_score(zscore_frames)
+        combined_payload = {
+            "timestamps": [int(ts.value // 10**6) for ts in combined.index],
+            "values": [float(v) for v in combined.values],
         }
-        for ts, z in anomalies.items():
-            events_payload.append(
-                {
-                    "metric": label,
-                    "timestamp": int(ts.value // 10**6),
-                    "iso": ts.isoformat(),
-                    "value": float(series.loc[ts]),
-                    "zscore": float(z),
-                }
-            )
 
-    combined = aggregate_score(zscore_frames)
-    combined_payload = {
-        "timestamps": [int(ts.value // 10**6) for ts in combined.index],
-        "values": [float(v) for v in combined.values],
-    }
+        events_payload.sort(key=lambda item: item["timestamp"])
 
-    events_payload.sort(key=lambda item: item["timestamp"])
+        body = {
+            "window_seconds": seconds,
+            "points": points,
+            "threshold": threshold,
+            "window": window,
+            "series": series_payload,
+            "score": combined_payload,
+            "events": events_payload,
+        }
 
-    body = {
-        "window_seconds": seconds,
-        "points": points,
-        "threshold": threshold,
-        "window": window,
-        "series": series_payload,
-        "score": combined_payload,
-        "events": events_payload,
-    }
+        return (
+            json.dumps(body),
+            200,
+            {"Content-Type": "application/json"},
+        )
+    except Exception as exc:  # pragma: no cover
+        import sys
+        import traceback
 
-    return (
-        json.dumps(body),
-        200,
-        {"Content-Type": "application/json"},
-    )
+        print(f"[starlink-anomalies] handler error: {exc}", flush=True)
+        traceback.print_exc()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        return (
+            json.dumps({"error": str(exc), "traceback": traceback.format_exc()}),
+            500,
+            {"Content-Type": "application/json"},
+        )
+
+
+def handle_request(request):
+    args = getattr(request, "args", request)
+    return build_response(args)
+
+
+def app(environ, start_response):
+    method = (environ.get("REQUEST_METHOD") or "GET").upper()
+    if method not in ("GET", "HEAD"):
+        body = json.dumps({"error": "Method not allowed"})
+        start_response("405 Method Not Allowed", [("Content-Type", "application/json")])
+        return [b"" if method == "HEAD" else body.encode("utf-8")]
+
+    params = parse_qs(environ.get("QUERY_STRING", ""), keep_blank_values=False)
+    normalized = {key: values[0] if isinstance(values, list) and values else "" for key, values in params.items()}
+
+    body, status, headers = build_response(normalized)
+    try:
+        reason = HTTPStatus(status).phrase
+    except ValueError:
+        reason = "OK" if 200 <= status < 400 else "ERROR"
+
+    start_response(f"{status} {reason}", list(headers.items()))
+    if method == "HEAD":
+        return [b""]
+    return [body.encode("utf-8") if isinstance(body, str) else body]
+
+
+def lambda_handler(event, context):  # pragma: no cover
+    params = (event or {}).get("queryStringParameters") or {}
+    body, status, headers = build_response(params)
+    return {"statusCode": status, "headers": headers, "body": body}
 
