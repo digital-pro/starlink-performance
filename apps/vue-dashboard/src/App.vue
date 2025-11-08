@@ -43,41 +43,31 @@
 
     <!-- Totals and Diagnostics in one row -->
     <section style="margin-top: 12px;">
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:8px;">
-        <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Sum of downlink Mbps over selected time range converted to GB (assumes 15s scrape interval)">
-          <div style="font-size:11px; color:#778;">Download ({{ rangeLabel }})</div>
-          <div style="font-size:18px; font-weight:600;">{{ typeof totalDownGb === 'number' ? totalDownGb.toFixed(2) : 'N/A' }} GB</div>
-        </div>
-        <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Windows WiFi adapter link speed (Mbps). This is the negotiated connection speed between your WiFi adapter and Starlink router.">
-          <div style="font-size:11px; color:#778;">WiFi Speed</div>
-          <div style="font-size:18px; font-weight:600;">{{ typeof nicSpeedMbps === 'number' && Number.isFinite(nicSpeedMbps) ? Math.floor(nicSpeedMbps) : 'N/A' }} Mbps</div>
-        </div>
-        <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="GPS location of Starlink dish">
-          <div style="font-size:11px; color:#778;">Location</div>
-          <div style="display:flex; align-items:center; gap:4px;">
-            <div style="font-size:16px; font-weight:600;">{{ formatGpsLocation() }}</div>
-            <img 
-              v-if="gpsLatitude !== null && gpsLongitude !== null"
-              @click="showMapModal = true"
-              :src="`https://maps.googleapis.com/maps/api/staticmap?center=${gpsLatitude},${gpsLongitude}&zoom=15&size=60x60&markers=color:red%7C${gpsLatitude},${gpsLongitude}&key=AIzaSyBFw0Qbyq9zTFTd-tUY6d13V3-kNgJGLrI`"
-              alt="Location map"
-              style="cursor:pointer; width:28px; height:28px; border-radius:3px; border:1px solid #ddd; flex-shrink:0;"
-              title="Click to open larger map"
-            />
+      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:stretch;">
+        <div style="display:flex; flex-direction:column; gap:8px; flex:1 1 220px; max-width:280px;">
+          <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Sum of downlink Mbps over selected time range converted to GB (assumes 15s scrape interval)">
+            <div style="font-size:11px; color:#778;">Download ({{ rangeLabel }})</div>
+            <div style="font-size:18px; font-weight:600;">{{ typeof totalDownGb === 'number' ? totalDownGb.toFixed(2) : 'N/A' }} GB</div>
+          </div>
+          <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="WiFi link speed reported by the monitoring host. Falls back to router telemetry if the Windows metric is unavailable.">
+            <div style="font-size:11px; color:#778;">WiFi Speed</div>
+            <div style="font-size:18px; font-weight:600;">{{ typeof nicSpeedMbps === 'number' && Number.isFinite(nicSpeedMbps) ? Math.floor(nicSpeedMbps) : 'N/A' }} Mbps</div>
           </div>
         </div>
-        <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;">
-          <div style="font-size:11px; color:#778; display:flex; justify-content:space-between; align-items:center;">
-            <span>Internet at a Glance</span>
-            <span style="font-size:10px; color:#999;">Server: {{ speedtestServerLabel }}</span>
-          </div>
-          <div v-if="metrics.speedtestDown === 'N/A' || metrics.speedtestUp === 'N/A'" style="font-size:11px; color:#99a; margin-top:12px;">
-            Run the iPerf speedtest exporter to populate this card.
-          </div>
-          <div v-else style="display:flex; flex-direction:column; gap:2px; margin-top:6px;">
-            <div style="font-size:16px; font-weight:600; color:#1a73e8;">↓ {{ formatSpeedMetric(metrics.speedtestDown) }}</div>
-            <div style="font-size:16px; font-weight:600; color:#34a853;">↑ {{ formatSpeedMetric(metrics.speedtestUp) }}</div>
-            <div style="font-size:11px; color:#667;">Updated {{ formatRelativeTimestamp(metrics.speedtestUpdated) }} · Cadence {{ speedtestCadenceLabel }}</div>
+        <div style="flex:3 1 520px; min-width:320px;">
+          <div style="border:1px solid #eee; border-radius:10px; padding:10px 12px; background:#fff; height:100%;">
+            <div style="font-size:11px; color:#778; display:flex; justify-content:space-between; align-items:center;">
+              <span>Internet at a Glance</span>
+              <span style="font-size:10px; color:#999;">Server: {{ speedtestServerLabel }}</span>
+            </div>
+            <div v-if="metrics.speedtestDown === 'N/A' || metrics.speedtestUp === 'N/A'" style="font-size:11px; color:#99a; margin-top:10px;">
+              Run the iPerf speedtest exporter to populate this card.
+            </div>
+            <div v-else style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-top:8px;">
+              <div style="flex:1 1 160px; font-size:16px; font-weight:600; color:#1a73e8;">↓ {{ formatSpeedMetric(metrics.speedtestDown) }}</div>
+              <div style="flex:1 1 160px; font-size:16px; font-weight:600; color:#34a853;">↑ {{ formatSpeedMetric(metrics.speedtestUp) }}</div>
+              <div style="flex:0 1 auto; font-size:11px; color:#667;">Updated {{ formatRelativeTimestamp(metrics.speedtestUpdated) }} · Cadence {{ speedtestCadenceLabel }}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -87,23 +77,23 @@
 
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h3 style="margin:0;">Bandwidth (Down / Up)</h3>
+          <h3 style="margin:0; font-size:16px;">Bandwidth (Down / Up)</h3>
           <small style="color:#778;">starlink_down_mbps / starlink_up_mbps (recording rules)</small>
         </div>
-        <div v-if="!hasBandwidthData" style="height:240px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px;">No bandwidth data in selected window</div>
-        <v-chart v-else ref="bandwidthChart" :option="bandwidthOption" autoresize style="height:240px; margin-top:8px;" @legendselectchanged="onBandwidthLegendChange" />
+        <div v-if="!hasBandwidthData" style="height:180px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px;">No bandwidth data in selected window</div>
+        <v-chart v-else ref="bandwidthChart" :option="bandwidthOption" autoresize style="height:180px; margin-top:8px;" @legendselectchanged="onBandwidthLegendChange" />
       </div>
 
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;" title="Latency (ms) from starlink_latency_ms; packet loss (%) overlaid from starlink_packet_loss_pct">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
           <div style="display:flex; align-items:center; gap:10px;">
-            <h3 style="margin:0;">Latency (last {{ rangeLabel }})</h3>
+            <h3 style="margin:0; font-size:16px;">Latency (last {{ rangeLabel }})</h3>
             <button @click="openLossDetails" style="padding:4px 8px; border:1px solid #08c; background:#08c; color:white; border-radius:6px; cursor:pointer; font-size:12px;" title="Opens a modal with current/avg/max loss stats across multiple windows">Packet loss details</button>
           </div>
           <small style="color:#778;">starlink_latency_ms (recording rule)</small>
         </div>
-        <div v-if="!hasLatencyData" style="height:180px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px;">No latency data in selected window</div>
-        <v-chart v-else :option="latencyOption" autoresize style="height:180px; margin-top:8px;" />
+        <div v-if="!hasLatencyData" style="height:90px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px;">No latency data in selected window</div>
+        <v-chart v-else :option="latencyOption" autoresize style="height:90px; margin-top:8px;" />
       </div>
 
       <div style="border:1px solid #eee; border-radius:12px; padding:12px; background:white;">
@@ -229,60 +219,62 @@
       <div style="display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:8px; align-items:stretch;">
         
         <!-- Speedtest Supercard - Full Width -->
-        <div style="border:1px solid #eee; border-radius:8px; padding:12px; background:white; grid-column:1 / span 4; grid-row:1; display:flex; flex-direction:column; min-height:240px;">
-          <div style="font-size:11px; color:#778; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div style="border:1px solid #eee; border-radius:8px; padding:12px; background:white; grid-column:1 / span 4; grid-row:1; display:flex; flex-direction:column; gap:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#778;">
             <span>Internet at a Glance</span>
             <span v-if="showSyntheticSpeedtest" style="font-size:10px; color:#999;">{{ speedtestServerLabel }} · every {{ speedtestCadenceLabel }}</span>
             <span v-else-if="hasFallbackSpeedData" style="font-size:10px; color:#999;">Synthetic test unavailable – showing live Starlink throughput</span>
             <span v-else style="font-size:10px; color:#999;">Synthetic and live metrics unavailable</span>
           </div>
-          <div v-if="showSyntheticSpeedtest" style="flex:1; min-height:240px;">
-            <v-chart :option="speedtestOption" autoresize style="height:100%;" />
-          </div>
-          <div v-else-if="hasFallbackSpeedData" style="flex:1; min-height:240px; display:flex; flex-direction:column; justify-content:center; gap:14px; color:#445;">
-            <div style="font-size:11px; color:#8896af;">
-              Synthetic iPerf tests are unavailable, so this card summarizes the live Starlink telemetry already charted above.
-              Run the helper box speedtest exporter to restore synthetic results.
-            </div>
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:10px; font-size:12px;">
-              <div style="padding:10px; border:1px solid #f0f2f5; border-radius:8px; background:#fafbfd;">
-                <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Current download</div>
-                <div style="font-size:18px; font-weight:600; color:#1a73e8;">{{ formatSpeedMetric(fallbackDownInstant) }}</div>
-                <div style="font-size:11px; color:#8896af;">{{ fallbackDownInstant !== null ? 'from telemetry' : 'waiting for samples' }}</div>
+          <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:stretch;">
+            <div style="flex:2 1 340px; min-height:100px; display:flex; align-items:center; justify-content:center;">
+              <v-chart v-if="showSyntheticSpeedtest" :option="speedtestOption" autoresize style="height:120px; width:100%;" />
+              <div v-else-if="hasFallbackSpeedData" style="font-size:11px; color:#8896af; line-height:1.4;">
+                Synthetic iPerf tests are unavailable, so this card summarizes the live Starlink telemetry already charted above.
+                Run the helper box speedtest exporter to restore synthetic results.
               </div>
-              <div style="padding:10px; border:1px solid #f0f2f5; border-radius:8px; background:#fafbfd;">
-                <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Current upload</div>
-                <div style="font-size:18px; font-weight:600; color:#34a853;">{{ formatSpeedMetric(fallbackUpInstant) }}</div>
-                <div style="font-size:11px; color:#8896af;">{{ fallbackUpInstant !== null ? 'from telemetry' : 'waiting for samples' }}</div>
-              </div>
-              <div style="padding:10px; border:1px solid #f0f2f5; border-radius:8px; background:#fafbfd;">
-                <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Last minute data</div>
-                <div style="font-size:15px; font-weight:600;">↓ {{ formatMegabytes(fallbackDownMbPerMin) }} · ↑ {{ formatMegabytes(fallbackUpMbPerMin) }}</div>
-                <div style="font-size:11px; color:#8896af;">MB transferred in the most recent minute</div>
-              </div>
-              <div style="padding:10px; border:1px solid #f0f2f5; border-radius:8px; background:#fafbfd;">
-                <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Last 10 minutes</div>
-                <div style="font-size:15px; font-weight:600;">↓ {{ formatMegabytes(fallbackDownMbPer10m) }} · ↑ {{ formatMegabytes(fallbackUpMbPer10m) }}</div>
-                <div style="font-size:11px; color:#8896af;">Telemetered throughput (MB / 10 min)</div>
+              <div v-else style="color:#99a; font-size:12px; text-align:center; padding:0 16px;">
+                Waiting for metrics. Ensure the iPerf exporter is running on the helper box.
               </div>
             </div>
-          </div>
-          <div v-else style="flex:1; display:flex; align-items:center; justify-content:center; color:#99a; font-size:12px; text-align:center; padding:0 16px;">
-            Waiting for metrics. Ensure the iPerf exporter is running on the helper box.
-          </div>
-          <div style="margin-top:12px; display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:8px; font-size:12px; color:#445;">
-            <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
-              <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Latest download</div>
-              <div style="font-size:18px; font-weight:600; color:#1a73e8;">{{ formatSpeedMetric(displayDownloadMbps !== null ? displayDownloadMbps : 'N/A') }}</div>
-            </div>
-            <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
-              <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Latest upload</div>
-              <div style="font-size:18px; font-weight:600; color:#34a853;">{{ formatSpeedMetric(displayUploadMbps !== null ? displayUploadMbps : 'N/A') }}</div>
-            </div>
-            <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
-              <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Last success</div>
-              <div style="font-size:13px; font-weight:500; color:#334;">
-                {{ showSyntheticSpeedtest ? formatRelativeTimestamp(metrics.speedtestUpdated) : (hasFallbackSpeedData ? 'Live telemetry' : 'N/A') }}
+            <div style="flex:1 1 260px; display:flex; flex-direction:column; gap:8px;">
+              <div v-if="showSyntheticSpeedtest" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:8px; font-size:12px; color:#445;">
+                <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
+                  <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Latest download</div>
+                  <div style="font-size:18px; font-weight:600; color:#1a73e8;">{{ formatSpeedMetric(displayDownloadMbps !== null ? displayDownloadMbps : 'N/A') }}</div>
+                </div>
+                <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
+                  <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Latest upload</div>
+                  <div style="font-size:18px; font-weight:600; color:#34a853;">{{ formatSpeedMetric(displayUploadMbps !== null ? displayUploadMbps : 'N/A') }}</div>
+                </div>
+                <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
+                  <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Last success</div>
+                  <div style="font-size:13px; font-weight:500; color:#334;">
+                    {{ showSyntheticSpeedtest ? formatRelativeTimestamp(metrics.speedtestUpdated) : (hasFallbackSpeedData ? 'Live telemetry' : 'N/A') }}
+                  </div>
+                </div>
+              </div>
+              <div v-else-if="hasFallbackSpeedData" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:8px; font-size:12px; color:#445;">
+                <div style="padding:10px; border:1px solid #f0f2f5; border-radius:8px; background:#fafbfd;">
+                  <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Current download</div>
+                  <div style="font-size:18px; font-weight:600; color:#1a73e8;">{{ formatSpeedMetric(fallbackDownInstant) }}</div>
+                  <div style="font-size:11px; color:#8896af;">{{ fallbackDownInstant !== null ? 'from telemetry' : 'waiting for samples' }}</div>
+                </div>
+                <div style="padding:10px; border:1px solid #f0f2f5; border-radius:8px; background:#fafbfd;">
+                  <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Current upload</div>
+                  <div style="font-size:18px; font-weight:600; color:#34a853;">{{ formatSpeedMetric(fallbackUpInstant) }}</div>
+                  <div style="font-size:11px; color:#8896af;">{{ fallbackUpInstant !== null ? 'from telemetry' : 'waiting for samples' }}</div>
+                </div>
+                <div style="padding:10px; border:1px solid #f0f2f5; border-radius:8px; background:#fafbfd;">
+                  <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Last minute data</div>
+                  <div style="font-size:15px; font-weight:600;">↓ {{ formatMegabytes(fallbackDownMbPerMin) }} · ↑ {{ formatMegabytes(fallbackUpMbPerMin) }}</div>
+                  <div style="font-size:11px; color:#8896af;">MB transferred in the most recent minute</div>
+                </div>
+                <div style="padding:10px; border:1px solid #f0f2f5; border-radius:8px; background:#fafbfd;">
+                  <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Last 10 minutes</div>
+                  <div style="font-size:15px; font-weight:600;">↓ {{ formatMegabytes(fallbackDownMbPer10m) }} · ↑ {{ formatMegabytes(fallbackUpMbPer10m) }}</div>
+                  <div style="font-size:11px; color:#8896af;">Telemetered throughput (MB / 10 min)</div>
+                </div>
               </div>
             </div>
           </div>
@@ -291,15 +283,15 @@
         <!-- Azimuth Chart - Below speedtest, left half -->
         <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white; grid-column:1 / span 2; grid-row:2;">
           <div style="font-size:11px; color:#778; margin-bottom:4px;">Azimuth (deg)</div>
-          <div v-if="azimuthSeries.length === 0" style="height:100%; min-height:120px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="azimuthOption" autoresize style="height:140px;" />
+          <div v-if="azimuthSeries.length === 0" style="height:100%; min-height:60px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="azimuthOption" autoresize style="height:80px;" />
         </div>
 
         <!-- Elevation Chart - Below speedtest, right half -->
         <div style="border:1px solid #eee; border-radius:8px; padding:8px; background:white; grid-column:3 / span 2; grid-row:2;">
           <div style="font-size:11px; color:#778; margin-bottom:4px;">Elevation (deg)</div>
-          <div v-if="elevationSeries.length === 0" style="height:100%; min-height:120px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
-          <v-chart v-else :option="elevationOption" autoresize style="height:140px;" />
+          <div v-if="elevationSeries.length === 0" style="height:100%; min-height:60px; display:flex; align-items:center; justify-content:center; color:#99a; font-size:11px;">No data</div>
+          <v-chart v-else :option="elevationOption" autoresize style="height:80px;" />
         </div>
       </div>
     </section>
@@ -336,6 +328,7 @@ const flags = ref<{ latencySpike: boolean; microLoss: boolean; outage: boolean; 
 });
 
 const corr = ref<{ drops: number | 'N/A'; cpu: number | 'N/A'; ac15: number | 'N/A'; periodic: boolean }>({ drops: 'N/A', cpu: 'N/A', ac15: 'N/A', periodic: false });
+const sessionNotes = ref('');
 
 const totalDownGb = ref<number | 'N/A'>('N/A');
 const nicSpeedMbps = ref<number | 'N/A'>('N/A');
@@ -500,14 +493,44 @@ function formatRelativeTimestamp(value: number | string): string {
 
 function formatLocalTimeShort(ts: number): string {
   return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
     hour12: false
   }).format(new Date(ts));
 }
+
+const formatDuration = (ms: number): string => {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return `${seconds}s`;
+  return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+};
+
+const formatDeltaLabel = (base: number, compare: number): string => {
+  const delta = compare - base;
+  if (delta === 0) return '±0s';
+  const direction = delta > 0 ? '+' : '−';
+  return `${direction}${formatDuration(Math.abs(delta))}`;
+};
+
+const describeAnomalyMetric = (metric: string): string => {
+  switch (metric) {
+    case 'downlink':
+      return 'Download throughput deviated from its rolling baseline.';
+    case 'uplink':
+      return 'Upload throughput deviated from its rolling baseline.';
+    case 'latency':
+      return 'Latency changed sharply relative to the recent median.';
+    case 'loss':
+      return 'Packet loss spiked above the expected range.';
+    case 'obstruction':
+      return 'Dish obstruction ratio changed significantly.';
+    default:
+      return 'An anomaly was detected in this signal.';
+  }
+};
 
 function formatGpsLocation(): string {
   if (gpsLatitude.value !== null && gpsLongitude.value !== null) {
@@ -757,8 +780,14 @@ async function refreshAll() {
   const totalGb = await fetchInstantProm(rangeQuery, fixedEnd);
   totalDownGb.value = typeof totalGb === 'number' && Number.isFinite(totalGb) ? totalGb : 'N/A';
 
-  // WiFi link speed (Mbps): windows_wifi_link_speed_mbps - connection speed between computer and Starlink router
-  const wifi = await fetchInstantProm('windows_wifi_link_speed_mbps', fixedEnd);
+  // WiFi link speed (Mbps): starts with host metric, falls back to router telemetry if unavailable
+  let wifi = await fetchInstantProm('windows_wifi_link_speed_mbps', fixedEnd);
+  if (wifi === 'N/A') {
+    wifi = await fetchInstantProm('starlink_router_wifi_link_speed_mbps', fixedEnd);
+  }
+  if (wifi === 'N/A') {
+    wifi = await fetchInstantProm('starlink_router_network_wifi_link_speed_mbps', fixedEnd);
+  }
   nicSpeedMbps.value = typeof wifi === 'number' && Number.isFinite(wifi) ? wifi : 'N/A';
 
   // Speedtest metrics (iperf3)
@@ -999,7 +1028,7 @@ async function computeLocalAnomalyFallback(seconds: number, step: number, fixedE
 }
 
 async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: number) {
-  const events: Array<{ time: string; timestamp: number; message: string; icon: string; color: string }> = [];
+  const events: Array<{ time: string; timestamp: number; message: string; icon: string; color: string; type: string }> = [];
   
   try {
     // Fetch metrics for smart event detection
@@ -1023,7 +1052,6 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
     let networkIssueStart = 0;
     
     const formatTime = (ts: number) => new Intl.DateTimeFormat(undefined, {
-      month: 'short', day: 'numeric',
       hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
     }).format(new Date(ts));
     
@@ -1060,7 +1088,7 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
       if (isOutage && !inSkySearch) {
         inSkySearch = true;
         skySearchStart = ts;
-        const outageType = isRouterOffline ? 'Router offline' : 'Network interruption';
+        const outageType = isRouterOffline ? 'Router offline' : 'Interruption';
         const icon = isRouterOffline ? '🔌' : '⚠️';
         const color = isRouterOffline ? '#c33' : '#f90';
         events.push({
@@ -1068,7 +1096,8 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
           timestamp: ts,
           message: outageType,
           icon,
-          color
+          color,
+          type: isRouterOffline ? 'Router Offline' : 'Interruption'
         });
       } else if (!isOutage && inSkySearch) {
         inSkySearch = false;
@@ -1079,9 +1108,10 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
         events.push({
           time: formatTime(ts),
           timestamp: ts,
-          message: `Connected (offline ${durationMsg})`,
+          message: `Recovered (${durationMsg})`,
           icon: '✅',
-          color: '#0a7'
+          color: '#0a7',
+          type: 'Recovery'
         });
       }
       
@@ -1093,9 +1123,10 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
         events.push({
           time: formatTime(ts),
           timestamp: ts,
-          message: `Obstruction detected (${(obsFrac * 100).toFixed(1)}%)`,
+          message: `Obstruction ${(obsFrac * 100).toFixed(1)}%`,
           icon: '🚫',
-          color: '#c33'
+          color: '#c33',
+          type: 'Obstruction'
         });
       } else if (!isObstructed && inObstruction) {
         inObstruction = false;
@@ -1103,9 +1134,10 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
         events.push({
           time: formatTime(ts),
           timestamp: ts,
-          message: `Obstruction cleared (${durationSec}s)`,
+          message: `Obstruction clear (${durationSec}s)`,
           icon: '✓',
-          color: '#0a7'
+          color: '#0a7',
+          type: 'Obstruction'
         });
       }
       
@@ -1118,9 +1150,10 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
         events.push({
           time: formatTime(ts),
           timestamp: ts,
-          message: `Network degradation (${reason})`,
+          message: `Degradation (${reason})`,
           icon: '⚠️',
-          color: '#f60'
+          color: '#f60',
+          type: 'Degradation'
         });
       } else if (!hasNetworkIssue && inNetworkIssue) {
         inNetworkIssue = false;
@@ -1128,9 +1161,10 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
         events.push({
           time: formatTime(ts),
           timestamp: ts,
-          message: `Network recovered (${durationSec}s)`,
+          message: `Recovery (${durationSec}s)`,
           icon: '✓',
-          color: '#0a7'
+          color: '#0a7',
+          type: 'Recovery'
         });
       }
       
@@ -1150,9 +1184,10 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
           events.push({
             time: formatTime(ts),
             timestamp: ts,
-            message: `Obstruction spike ${(obsFrac*100).toFixed(1)}% (baseline ${(avgBaseline*100).toFixed(1)}%)`,
+            message: `Obstruction spike ${(obsFrac*100).toFixed(1)}%`,
             icon: '🔴',
-            color: '#c33'
+            color: '#c33',
+            type: 'Obstruction'
           });
         } else if (obsFrac > avgBaseline + 0.015) {
           events.push({
@@ -1160,7 +1195,8 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
             timestamp: ts,
             message: `Obstruction increased ${(obsFrac*100).toFixed(1)}%`,
             icon: '🟠',
-            color: '#f60'
+            color: '#f60',
+            type: 'Obstruction'
           });
         }
         
@@ -1169,9 +1205,10 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
           events.push({
             time: formatTime(ts),
             timestamp: ts,
-            message: `High packet loss ${(loss*100).toFixed(1)}%`,
+            message: `High loss ${(loss*100).toFixed(1)}%`,
             icon: '⚠️',
-            color: '#f90'
+            color: '#f90',
+            type: 'Packet Loss'
           });
         }
       }
@@ -1186,18 +1223,15 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
       events.push({
         time: formatTime(firstTs),
         timestamp: firstTs,
-        message: `Persistent obstruction (${(avgObsFrac*100).toFixed(1)}% avg)`,
+        message: `Obstruction persistent ${(avgObsFrac*100).toFixed(1)}%`,
         icon: '🚫',
-        color: '#c33'
+        color: '#c33',
+        type: 'Obstruction'
       });
     }
     
     // Sort by time (newest first) and limit to last 20
-    events.sort((a, b) => {
-      const aTime = new Date(a.time).getTime();
-      const bTime = new Date(b.time).getTime();
-      return bTime - aTime;
-    });
+    events.sort((a, b) => b.timestamp - a.timestamp);
     starlinkEvents.value = events.slice(0, 20);
     
     console.log(`📡 Detected ${events.length} Starlink events in last ${Math.round(seconds/60)}min`);
@@ -1262,7 +1296,7 @@ const speedtestUpSeries = ref<Array<[number, number]>>([]);
 const benchRuns = ref<Array<{ task: string; start: number; end: number }>>([]);
 const anomalySeries = ref<Array<[number, number]>>([]);
 const starlinkAnomalyEvents = ref<Array<{ metric: string; timestamp: number; iso: string; value: number; zscore: number }>>([]);
-const starlinkEvents = ref<Array<{ time: string; timestamp: number; message: string; icon: string; color: string }>>([]);
+const starlinkEvents = ref<Array<{ time: string; timestamp: number; message: string; icon: string; color: string; type: string }>>([]);
 
 // Diagnostic charts series
 const azimuthSeries = ref<Array<[number, number]>>([]);
@@ -1623,34 +1657,153 @@ const bandwidthOption = computed(() => {
 });
 
 const anomalyOption = computed(() => {
-  const anomalyMarks = starlinkAnomalyEvents.value.map((event) => ({
-    name: `${event.metric.toUpperCase()}`,
-    xAxis: event.timestamp,
-    lineStyle: { color: '#d7263d', width: 2, type: 'dashed' },
-    label: {
-      show: true,
-      formatter: () => `${event.metric.toUpperCase()} z=${event.zscore.toFixed(1)}\n${formatLocalTimeShort(event.timestamp)}`,
-      fontSize: 10
+  const anomalyMeta: Record<string, { label: string; color: string }> = {
+    downlink: { label: 'Download', color: '#1a73e8' },
+    uplink: { label: 'Upload', color: '#34a853' },
+    latency: { label: 'Latency', color: '#fbbc04' },
+    loss: { label: 'Packet Loss', color: '#f77f00' },
+    obstruction: { label: 'Obstruction', color: '#d7263d' }
+  };
+
+  const matchWindowMs = 5 * 60 * 1000;
+  const anomalyTooltipByTimestamp = new Map<number, string>();
+  const previousAnomalyByMetric = new Map<string, number>();
+  const sortedAnomalies = [...starlinkAnomalyEvents.value].sort((a, b) => a.timestamp - b.timestamp);
+  for (const anomaly of sortedAnomalies) {
+    const meta = anomalyMeta[anomaly.metric] ?? { label: anomaly.metric.toUpperCase(), color: '#d7263d' };
+    const description = describeAnomalyMetric(anomaly.metric);
+    const matches = starlinkEvents.value.filter((event) => Math.abs(event.timestamp - anomaly.timestamp) <= matchWindowMs);
+    const matchLines = matches.map((event) => `${event.icon} ${event.message} (${formatDeltaLabel(anomaly.timestamp, event.timestamp)})`);
+    const previousTs = previousAnomalyByMetric.get(anomaly.metric);
+    const sincePrevious = previousTs !== undefined ? formatDuration(anomaly.timestamp - previousTs) : undefined;
+    previousAnomalyByMetric.set(anomaly.metric, anomaly.timestamp);
+    const tooltipText = [
+      description,
+      `Detected at ${formatLocalTimeShort(anomaly.timestamp)}.`,
+      matchLines.length > 0
+        ? `Matching events (±${formatDuration(matchWindowMs)}):\n${matchLines.join('\n')}`
+        : `No matching events within ±${formatDuration(matchWindowMs)}.`,
+      sincePrevious
+        ? `Since previous ${meta.label.toLowerCase()} anomaly: ${sincePrevious}.`
+        : `First ${meta.label.toLowerCase()} anomaly in view.`
+    ].join('\n');
+    anomalyTooltipByTimestamp.set(anomaly.timestamp, tooltipText);
+  }
+
+  const anomalyGroups = new Map<string, Array<{ name: string; xAxis: number; lineStyle: { color: string; width: number; type: string }; label: { show: boolean; formatter: () => string; fontSize: number }; tooltip: { formatter: (params: any) => string }; value: string }>>();
+  for (const event of starlinkAnomalyEvents.value) {
+    const meta = anomalyMeta[event.metric] ?? { label: event.metric.toUpperCase(), color: '#d7263d' };
+    const group = anomalyGroups.get(meta.label) ?? [];
+    const tooltipText = anomalyTooltipByTimestamp.get(event.timestamp) ?? describeAnomalyMetric(event.metric);
+    group.push({
+      name: meta.label,
+      xAxis: event.timestamp,
+      lineStyle: { color: meta.color, width: 2, type: 'dashed' },
+      label: {
+        show: true,
+        formatter: () => `${meta.label}\nz=${event.zscore.toFixed(1)}\n${formatLocalTimeShort(event.timestamp)}`,
+        fontSize: 9
+      },
+      tooltip: {
+        formatter: (params: any) => params?.data?.value ?? tooltipText
+      },
+      value: tooltipText
+    });
+    anomalyGroups.set(meta.label, group);
+  }
+
+  const anomalySeriesEntries = Array.from(anomalyGroups.entries()).map(([label, lines]) => ({
+    type: 'line',
+    name: `Anomaly – ${label}`,
+    data: [],
+    showSymbol: false,
+    lineStyle: { width: 0, opacity: 0 },
+    markLine: {
+      symbol: ['none', 'none'],
+      data: lines
     }
   }));
 
-  const heuristicMarks = starlinkEvents.value.map(event => ({
-    name: event.message,
-    xAxis: event.timestamp,
-    lineStyle: { color: event.color, width: 2, type: 'dashed' },
-    label: {
-      show: true,
-      formatter: () => `${event.icon} ${event.message}\n${formatLocalTimeShort(event.timestamp)}`,
-      fontSize: 10
-    }
-  }));
+  const previousHeuristicByType = new Map<string, number>();
+  const heuristicTooltipByTimestamp = new Map<number, string>();
+  const sortedHeuristics = [...starlinkEvents.value].sort((a, b) => a.timestamp - b.timestamp);
+  for (const event of sortedHeuristics) {
+    const typeLabel = event.type || event.message || 'Other';
+    const previousTs = previousHeuristicByType.get(typeLabel);
+    const sincePrevious = previousTs !== undefined ? formatDuration(event.timestamp - previousTs) : undefined;
+    previousHeuristicByType.set(typeLabel, event.timestamp);
+    const tooltipText = [
+      `${event.icon} ${event.message}`,
+      `Detected at ${formatLocalTimeShort(event.timestamp)}.`,
+      sincePrevious
+        ? `Since previous ${typeLabel.toLowerCase()} event: ${sincePrevious}.`
+        : `First ${typeLabel.toLowerCase()} event in view.`
+    ].join('\n');
+    heuristicTooltipByTimestamp.set(event.timestamp, tooltipText);
+  }
 
-  const eventMarkLines = [...anomalyMarks, ...heuristicMarks];
+  const heuristicMarksByType = new Map<string, Array<{ name: string; xAxis: number; lineStyle: { color: string; width: number; type: string }; label: { show: boolean; formatter: () => string; fontSize: number }; tooltip: { formatter: (params: any) => string }; value: string }>>();
+  for (const event of starlinkEvents.value) {
+    const typeLabel = event.type || event.message || 'Other';
+    const entry = {
+      name: `${event.icon} ${event.message}`,
+      xAxis: event.timestamp,
+      lineStyle: { color: event.color, width: 2, type: 'dashed' },
+      label: {
+        show: true,
+        formatter: () => `${event.icon} ${event.message}\n${formatLocalTimeShort(event.timestamp)}`,
+        fontSize: 9
+      },
+      tooltip: {
+        formatter: (params: any) => params?.data?.value ?? heuristicTooltipByTimestamp.get(event.timestamp) ?? `${event.icon} ${event.message}`
+      },
+      value: heuristicTooltipByTimestamp.get(event.timestamp) ?? `${event.icon} ${event.message}`
+    };
+    const group = heuristicMarksByType.get(typeLabel) ?? [];
+    group.push(entry);
+    heuristicMarksByType.set(typeLabel, group);
+  }
+
+  const heuristicEntriesSorted = Array.from(heuristicMarksByType.entries()).sort((a, b) => b[1].length - a[1].length);
+  const maxHeuristicGroups = 4;
+  const primaryHeuristics = heuristicEntriesSorted.length > maxHeuristicGroups
+    ? heuristicEntriesSorted.slice(0, maxHeuristicGroups - 1)
+    : heuristicEntriesSorted;
+  const remainingHeuristics = heuristicEntriesSorted.length > maxHeuristicGroups
+    ? heuristicEntriesSorted.slice(maxHeuristicGroups - 1)
+    : [];
+  const heuristicSeriesEntries = [
+    ...primaryHeuristics.map(([typeLabel, lines]) => ({
+      type: 'line',
+      name: `Event – ${typeLabel}`,
+      data: [],
+      showSymbol: false,
+      lineStyle: { width: 0, opacity: 0 },
+      markLine: {
+        symbol: ['none', 'none'],
+        data: lines
+      }
+    })),
+    ...(remainingHeuristics.length > 0 ? [{
+      type: 'line',
+      name: 'Event – Other',
+      data: [],
+      showSymbol: false,
+      lineStyle: { width: 0, opacity: 0 },
+      markLine: {
+        symbol: ['none', 'none'],
+        data: remainingHeuristics.flatMap(([, lines]) => lines)
+      }
+    }] : [])
+  ];
 
   return {
     tooltip: { trigger: 'axis', valueFormatter: formatTooltipValue },
-    grid: { left: 40, right: 80, top: 48, bottom: 24 },
-    legend: { top: 4, data: ['Anomaly Score'] },
+    grid: { left: 40, right: 80, top: 64, bottom: 24 },
+    legend: {
+      top: 6,
+      textStyle: { fontSize: 10 }
+    },
     xAxis: {
       type: 'time',
       axisLabel: { color: '#667' },
@@ -1666,12 +1819,10 @@ const anomalyOption = computed(() => {
       max: 100
     },
     series: [
-      { type: 'line', name: 'Anomaly Score', data: anomalySeries.value, showSymbol: false, lineStyle: { width: 1.5 } }
-    ],
-    markLine: eventMarkLines.length > 0 ? {
-      data: eventMarkLines.map(line => [{ xAxis: line.xAxis, lineStyle: line.lineStyle, label: line.label, name: line.name }]),
-      symbol: ['none', 'none']
-    } : undefined
+      { type: 'line', name: 'Anomaly Score', data: anomalySeries.value, showSymbol: false, lineStyle: { width: 1.5 } },
+      ...anomalySeriesEntries,
+      ...heuristicSeriesEntries
+    ]
   };
 });
 
