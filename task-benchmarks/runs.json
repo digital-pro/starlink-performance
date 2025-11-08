@@ -1685,5 +1685,68 @@
     "finishPT": "12:14 PT",
     "start": 1762545822975,
     "end": 1762546476731
+  },
+  {
+    "task": "theory-of-mind",
+    "spec": "cypress/e2e/theory_of_mind.cy.js",
+    "timestamp": "2025-11-07T20:15:38.604Z",
+    "finishedAt": "2025-11-07T20:21:36.392Z",
+    "status": "failed",
+    "real": "5m57.788s",
+    "realSeconds": 357.788,
+    "cypressDurationMs": 343260,
+    "totals": {
+      "tests": 1,
+      "passes": 0,
+      "failures": 1,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "12:15 PT",
+    "finishPT": "12:21 PT",
+    "start": 1762546538604,
+    "end": 1762546896392
+  },
+  {
+    "task": "theory-of-mind",
+    "spec": "cypress/e2e/theory_of_mind.cy.js",
+    "timestamp": "2025-11-07T20:24:05.233Z",
+    "finishedAt": "2025-11-07T20:25:40.102Z",
+    "status": "passed",
+    "real": "1m34.869s",
+    "realSeconds": 94.869,
+    "cypressDurationMs": 78845,
+    "totals": {
+      "tests": 1,
+      "passes": 1,
+      "failures": 0,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "12:24 PT",
+    "finishPT": "12:25 PT",
+    "start": 1762547045233,
+    "end": 1762547140102
+  },
+  {
+    "task": "theory-of-mind",
+    "spec": "cypress/e2e/theory_of_mind.cy.js",
+    "timestamp": "2025-11-07T21:33:48.728Z",
+    "finishedAt": "2025-11-07T21:35:27.045Z",
+    "status": "passed",
+    "real": "1m38.317s",
+    "realSeconds": 98.317,
+    "cypressDurationMs": 86551,
+    "totals": {
+      "tests": 1,
+      "passes": 1,
+      "failures": 0,
+      "pending": 0,
+      "skipped": 0
+    },
+    "startPT": "13:33 PT",
+    "finishPT": "13:35 PT",
+    "start": 1762551228728,
+    "end": 1762551327045
   }
 ]

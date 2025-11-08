@@ -1034,6 +1034,8 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
     // Calculate rolling baseline for obstruction (average over last 5 minutes)
     const baselineWindow = 10; // samples (~5 minutes with 30s step)
     const obstructionBaseline: number[] = [];
+    const outageThresholdBytes = 25000; // ≈200 Kbps
+    const hardOfflineThreshold = 5000; // ≈40 Kbps
     
     for (let i = 0; i < downThroughput.length; i++) {
       const ts = downThroughput[i][0];
@@ -1048,23 +1050,25 @@ async function loadStarlinkEvents(seconds: number, step: number, fixedEnd: numbe
       maxLoss = Math.max(maxLoss, loss);
       maxLat = Math.max(maxLat, lat);
       
-      // Outage Detection: Both throughputs drop to near-zero (< 10000 bytes/sec = ~80 Kbps)
-      const isOutage = downBps < 10000 && upBps < 10000;
-      // Router offline: Complete failure (zero throughput + high packet loss)
-      const isRouterOffline = isOutage && loss > 0.8; // 80%+ packet loss
+      // Outage Detection: Both throughputs drop to near-zero
+      const isOutage = downBps < outageThresholdBytes && upBps < outageThresholdBytes;
+      // Router offline: sustained zero throughput or heavy loss
+      const isRouterOffline =
+        isOutage && (loss > 0.1 || (downBps < hardOfflineThreshold && upBps < hardOfflineThreshold));
       const isSkySearching = isOutage && !isRouterOffline;
       
       if (isOutage && !inSkySearch) {
         inSkySearch = true;
         skySearchStart = ts;
-        const outageType = isRouterOffline ? 'Router offline' : 'Sky search started';
-        const icon = isRouterOffline ? '🔌' : '🔍';
+        const outageType = isRouterOffline ? 'Router offline' : 'Network interruption';
+        const icon = isRouterOffline ? '🔌' : '⚠️';
+        const color = isRouterOffline ? '#c33' : '#f90';
         events.push({
           time: formatTime(ts),
           timestamp: ts,
           message: outageType,
-          icon: icon,
-          color: isRouterOffline ? '#c33' : '#f90'
+          icon,
+          color
         });
       } else if (!isOutage && inSkySearch) {
         inSkySearch = false;
