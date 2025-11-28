@@ -24,7 +24,7 @@
           <option :value="43200">Last 12 hours</option>
         </select>
         <label style="display:flex; align-items:center; gap:4px; font-size:12px; color:#556;">
-          <span>Offset:</span>
+          <span>Go Back:</span>
           <input v-model.number="rangeShiftMinutes" type="number" min="0" step="30" style="width:60px; padding:3px 6px; border:1px solid #ccd; border-radius:6px; text-align:right;" />
           <span>min</span>
         </label>
@@ -43,31 +43,50 @@
 
     <!-- Totals and Diagnostics in one row -->
     <section style="margin-top: 12px;">
-      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:stretch;">
-        <div style="display:flex; flex-direction:column; gap:8px; flex:1 1 220px; max-width:280px;">
-          <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="Sum of downlink Mbps over selected time range converted to GB (assumes 15s scrape interval)">
-            <div style="font-size:11px; color:#778;">Download ({{ rangeLabel }})</div>
-            <div style="font-size:18px; font-weight:600;">{{ typeof totalDownGb === 'number' ? totalDownGb.toFixed(2) : 'N/A' }} GB</div>
+      <div style="display:grid; grid-template-columns: minmax(460px, 2fr) minmax(180px, 0.7fr); gap:8px; align-items:stretch;">
+        <div style="border:1px solid #eee; border-radius:10px; padding:8px 10px; background:#fff; min-width:320px; height:100%; display:flex; flex-direction:column;" title="Lightweight speedtest under load synthetic or fallback telemetry summary.">
+          <div style="font-size:11px; color:#778; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:600;">Lightweight speedtest under load</span>
+            <span style="font-size:10px; color:#999;">Range: {{ rangeLabel }}</span>
           </div>
-          <div style="border:1px solid #eee; border-radius:10px; padding:8px; background:#fff;" title="WiFi link speed reported by the monitoring host. Falls back to router telemetry if the Windows metric is unavailable.">
-            <div style="font-size:11px; color:#778;">WiFi Speed</div>
-            <div style="font-size:18px; font-weight:600;">{{ typeof nicSpeedMbps === 'number' && Number.isFinite(nicSpeedMbps) ? Math.floor(nicSpeedMbps) : 'N/A' }} Mbps</div>
+          <div v-if="hasTransferData" style="display:flex; align-items:stretch; gap:10px; margin-top:6px; flex-wrap:wrap;">
+            <div style="flex:1 1 260px; min-width:220px; display:flex; flex-direction:column; gap:6px;">
+              <v-chart :option="heroTransferOption" autoresize style="height:104px; width:100%;" />
+              <div v-if="transferUsingPromFallback" style="font-size:10px; color:#8b97b3;">Using Prometheus fallback (Netdata samples unavailable).</div>
+            </div>
+            <div style="flex:0 1 240px; min-width:200px; display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:6px; align-content:start;">
+              <div style="padding:6px 8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
+                <div style="font-size:9px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Total downloaded</div>
+                <div style="font-size:16px; font-weight:600; color:#1a73e8;">{{ formatGigabytes(totalDownloadGb) }}</div>
+                <div style="font-size:10px; color:#8896af;">Last min: {{ formatMbPerMinute(latestDownloadMbPerMinute) }}</div>
+              </div>
+              <div style="padding:6px 8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
+                <div style="font-size:9px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Total uploaded</div>
+                <div style="font-size:16px; font-weight:600; color:#34a853;">{{ formatGigabytes(totalUploadGb) }}</div>
+                <div style="font-size:10px; color:#8896af;">Last min: {{ formatMbPerMinute(latestUploadMbPerMinute) }}</div>
+              </div>
+              <div style="padding:6px 8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd; grid-column: span 2;">
+                <div style="font-size:9px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Average per minute</div>
+                <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600;">
+                  <span style="color:#1a73e8;">↓ {{ formatMbPerMinute(avgDownloadMb) }}</span>
+                  <span style="color:#34a853;">↑ {{ formatMbPerMinute(avgUploadMb) }}</span>
+                </div>
+                <div style="font-size:10px; color:#8896af; margin-top:2px;">Minutes with data: {{ transferMinutes || 0 }}</div>
+              </div>
+            </div>
+          </div>
+          <div v-else style="margin-top:8px; font-size:11px; color:#99a;">
+            Waiting for throughput samples in the selected window.
           </div>
         </div>
-        <div style="flex:3 1 520px; min-width:320px;">
-          <div style="border:1px solid #eee; border-radius:10px; padding:10px 12px; background:#fff; height:100%;">
-            <div style="font-size:11px; color:#778; display:flex; justify-content:space-between; align-items:center;">
-              <span>Internet at a Glance</span>
-              <span style="font-size:10px; color:#999;">Server: {{ speedtestServerLabel }}</span>
-            </div>
-            <div v-if="metrics.speedtestDown === 'N/A' || metrics.speedtestUp === 'N/A'" style="font-size:11px; color:#99a; margin-top:10px;">
-              Run the iPerf speedtest exporter to populate this card.
-            </div>
-            <div v-else style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-top:8px;">
-              <div style="flex:1 1 160px; font-size:16px; font-weight:600; color:#1a73e8;">↓ {{ formatSpeedMetric(metrics.speedtestDown) }}</div>
-              <div style="flex:1 1 160px; font-size:16px; font-weight:600; color:#34a853;">↑ {{ formatSpeedMetric(metrics.speedtestUp) }}</div>
-              <div style="flex:0 1 auto; font-size:11px; color:#667;">Updated {{ formatRelativeTimestamp(metrics.speedtestUpdated) }} · Cadence {{ speedtestCadenceLabel }}</div>
-            </div>
+        <div style="display:flex; flex-direction:column; gap:8px; min-width:200px; align-items:stretch;">
+          <div style="border:1px solid #eee; border-radius:10px; padding:6px 8px; background:#fff; min-height:60px; display:flex; flex-direction:column; justify-content:space-between;" title="Aggregated download volume over the selected range.">
+            <div style="font-size:11px; color:#778;">Download ({{ rangeLabel }})</div>
+            <div style="font-size:17px; font-weight:600;">{{ typeof totalDownGb === 'number' ? totalDownGb.toFixed(2) : 'N/A' }} GB</div>
+          </div>
+          <div style="border:1px solid #eee; border-radius:10px; padding:6px 8px; background:#fff; min-height:60px; display:flex; flex-direction:column; justify-content:space-between;" title="WiFi link speed reported by the monitoring host. Falls back to router telemetry if the Windows metric is unavailable.">
+            <div style="font-size:11px; color:#778;">WiFi Speed</div>
+            <div style="font-size:17px; font-weight:600;">{{ typeof nicSpeedMbps === 'number' && Number.isFinite(nicSpeedMbps) ? Math.floor(nicSpeedMbps) : 'N/A' }} Mbps</div>
           </div>
         </div>
       </div>
@@ -222,36 +241,45 @@
         <div style="border:1px solid #eee; border-radius:8px; padding:12px; background:white; grid-column:1 / span 4; grid-row:1; display:flex; flex-direction:column; gap:12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#778;">
             <span>Internet at a Glance</span>
-            <span v-if="showSyntheticSpeedtest" style="font-size:10px; color:#999;">{{ speedtestServerLabel }} · every {{ speedtestCadenceLabel }}</span>
+            <span v-if="hasSpeedtestSeries" style="font-size:10px; color:#999;">{{ speedtestServerLabel }}{{ speedtestStatusSuffix }}</span>
             <span v-else-if="hasFallbackSpeedData" style="font-size:10px; color:#999;">Synthetic test unavailable – showing live Starlink throughput</span>
             <span v-else style="font-size:10px; color:#999;">Synthetic and live metrics unavailable</span>
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:stretch;">
             <div style="flex:2 1 340px; min-height:100px; display:flex; align-items:center; justify-content:center;">
-              <v-chart v-if="showSyntheticSpeedtest" :option="speedtestOption" autoresize style="height:120px; width:100%;" />
-              <div v-else-if="hasFallbackSpeedData" style="font-size:11px; color:#8896af; line-height:1.4;">
-                Synthetic iPerf tests are unavailable, so this card summarizes the live Starlink telemetry already charted above.
-                Run the helper box speedtest exporter to restore synthetic results.
+              <div v-if="hasSpeedtestSeries" style="width:100%;">
+                <v-chart :option="speedtestOption" autoresize style="height:120px; width:100%;" />
+                <div v-if="!showSyntheticSpeedtest" style="margin-top:6px; font-size:10px; color:#8b97b3; text-align:left;">
+                  Latest synthetic sample is older than expected; chart reflects the most recent recorded run.
+                </div>
+              </div>
+              <div v-else-if="hasFallbackSpeedData" style="width:100%;">
+                <v-chart :option="speedtestFallbackOption" autoresize style="height:120px; width:100%;" />
+                <div style="margin-top:6px; font-size:10px; color:#8b97b3; text-align:left;">
+                  Synthetic iPerf tests are unavailable, so this panel shows the live Starlink throughput already charted above.
+                  Run the helper box speedtest exporter to restore synthetic results.
+                </div>
               </div>
               <div v-else style="color:#99a; font-size:12px; text-align:center; padding:0 16px;">
                 Waiting for metrics. Ensure the iPerf exporter is running on the helper box.
               </div>
             </div>
             <div style="flex:1 1 260px; display:flex; flex-direction:column; gap:8px;">
-              <div v-if="showSyntheticSpeedtest" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:8px; font-size:12px; color:#445;">
-                <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
+              <div v-if="hasSpeedtestSeries" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:8px; font-size:12px; color:#445;">
+                <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd; display:flex; flex-direction:column; gap:4px;">
                   <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Latest download</div>
-                  <div style="font-size:18px; font-weight:600; color:#1a73e8;">{{ formatSpeedMetric(displayDownloadMbps !== null ? displayDownloadMbps : 'N/A') }}</div>
+                  <div style="font-size:18px; font-weight:600; color:#1a73e8;">{{ formatSpeedMetric(currentSpeedtestDownload) }}</div>
+                  <div style="font-size:10px; color:#8896af;">{{ showSyntheticSpeedtest ? 'Fresh iperf sample' : 'Most recent run' }}</div>
                 </div>
-                <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
+                <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd; display:flex; flex-direction:column; gap:4px;">
                   <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Latest upload</div>
-                  <div style="font-size:18px; font-weight:600; color:#34a853;">{{ formatSpeedMetric(displayUploadMbps !== null ? displayUploadMbps : 'N/A') }}</div>
+                  <div style="font-size:18px; font-weight:600; color:#34a853;">{{ formatSpeedMetric(currentSpeedtestUpload) }}</div>
+                  <div style="font-size:10px; color:#8896af;">{{ showSyntheticSpeedtest ? 'Fresh iperf sample' : 'Most recent run' }}</div>
                 </div>
-                <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd;">
+                <div style="padding:8px; border:1px solid #f0f2f5; border-radius:6px; background:#fafbfd; display:flex; flex-direction:column; gap:4px;">
                   <div style="font-size:10px; color:#8896af; text-transform:uppercase; letter-spacing:0.5px;">Last success</div>
-                  <div style="font-size:13px; font-weight:500; color:#334;">
-                    {{ showSyntheticSpeedtest ? formatRelativeTimestamp(metrics.speedtestUpdated) : (hasFallbackSpeedData ? 'Live telemetry' : 'N/A') }}
-                  </div>
+                  <div style="font-size:13px; font-weight:500; color:#334;">{{ speedtestTimestampDisplay }}</div>
+                  <div style="font-size:10px; color:#8896af;">{{ speedtestTimestampCaption }}</div>
                 </div>
               </div>
               <div v-else-if="hasFallbackSpeedData" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap:8px; font-size:12px; color:#445;">
@@ -472,6 +500,22 @@ function formatMegabytes(value: number | null | undefined): string {
   if (abs >= 1024) return `${(value / 1024).toFixed(1)} GB`;
   if (abs >= 10) return `${value.toFixed(1)} MB`;
   return `${value.toFixed(2)} MB`;
+}
+
+function formatGigabytes(value: number | null | undefined): string {
+  if (value === null || value === undefined) return 'N/A';
+  if (!Number.isFinite(value)) return 'N/A';
+  if (Math.abs(value) >= 1) return `${value.toFixed(2)} GB`;
+  return `${(value * 1024).toFixed(1)} MB`;
+}
+
+function formatMbPerMinute(value: number | null | undefined): string {
+  if (value === null || value === undefined) return 'N/A';
+  if (!Number.isFinite(value)) return 'N/A';
+  const abs = Math.abs(value);
+  if (abs >= 100) return `${value.toFixed(0)} MB/min`;
+  if (abs >= 10) return `${value.toFixed(1)} MB/min`;
+  return `${value.toFixed(2)} MB/min`;
 }
 
 function formatRelativeTimestamp(value: number | string): string {
@@ -810,7 +854,7 @@ async function refreshAll() {
 
   latencySeries.value = await fetchRangeProm(q.latency, seconds, step, fixedEnd);
   packetLossSeries.value = await fetchRangeProm(q.packetLoss, seconds, step, fixedEnd);
-  const [down, up, ml, downMBm, upMBm, downMB10, upMB10, speedDownRange, speedUpRange] = await Promise.all([
+  const [down, up, ml, downMBm, upMBm, downMB10, upMB10, speedDownRange, speedUpRange, downBytesRange, upBytesRange] = await Promise.all([
     fetchRangeProm(downRateExpr, seconds, step, fixedEnd),
     fetchRangeProm(upRateExpr, seconds, step, fixedEnd),
     fetchRangeProm('starlink_micro_loss', seconds, step, fixedEnd),
@@ -819,13 +863,45 @@ async function refreshAll() {
     fetchRangeProm('avg_over_time(starlink_dish_downlink_throughput_bps_avg_10s[10m]) * 600 / 8000000', seconds, step, fixedEnd),
     fetchRangeProm('avg_over_time(starlink_dish_uplink_throughput_bps_avg_10s[10m]) * 600 / 8000000', seconds, step, fixedEnd),
     fetchRangeProm('starlink_speedtest_download_mbps', seconds, step, fixedEnd),
-    fetchRangeProm('starlink_speedtest_upload_mbps', seconds, step, fixedEnd)
+    fetchRangeProm('starlink_speedtest_upload_mbps', seconds, step, fixedEnd),
+    fetchRangeProm('starlink_dish_downlink_throughput_bytes', seconds, step, fixedEnd),
+    fetchRangeProm('starlink_dish_uplink_throughput_bytes', seconds, step, fixedEnd)
   ]);
   bandwidthDownSeries.value = down;
   bandwidthUpSeries.value = up;
   microLossSeries.value = ml;
   speedtestDownSeries.value = speedDownRange;
   speedtestUpSeries.value = speedUpRange;
+
+  const integratedDownPerMinute = aggregateBytesPerSecondToMbPerMinute(downBytesRange);
+  const integratedUpPerMinute = aggregateBytesPerSecondToMbPerMinute(upBytesRange);
+  const fallbackDownPerMinute = downMBm.map(([ts, value]) => [ts, Math.max(0, Number(value))] as [number, number]);
+  const fallbackUpPerMinute = upMBm.map(([ts, value]) => [ts, Math.max(0, Number(value))] as [number, number]);
+
+  let resolvedDownPerMinute = integratedDownPerMinute;
+  let resolvedUpPerMinute = integratedUpPerMinute;
+  let resolvedSource: 'integrated' | 'promFallback' | 'none' = 'integrated';
+
+  if (resolvedDownPerMinute.length === 0 && resolvedUpPerMinute.length === 0) {
+    if (fallbackDownPerMinute.length > 0 || fallbackUpPerMinute.length > 0) {
+      resolvedDownPerMinute = fallbackDownPerMinute;
+      resolvedUpPerMinute = fallbackUpPerMinute;
+      resolvedSource = 'promFallback';
+    } else {
+      resolvedSource = 'none';
+    }
+  }
+
+  downloadMbMinuteSeries.value = resolvedDownPerMinute;
+  uploadMbMinuteSeries.value = resolvedUpPerMinute;
+  transferSeriesSource.value = resolvedSource;
+
+  if (resolvedDownPerMinute.length > 0) {
+    const totalMb = resolvedDownPerMinute.reduce((sum, [, value]) => sum + Math.max(0, Number(value)), 0);
+    totalDownGb.value = Number.isFinite(totalMb) ? Number((totalMb / 1024).toFixed(2)) : 'N/A';
+  } else {
+    totalDownGb.value = typeof totalGb === 'number' && Number.isFinite(totalGb) ? totalGb : 'N/A';
+  }
 
   // Clamp MB/min and MB/10m to reduce unrealistic spikes from transient exporter outliers
   // Hard cap: Starlink max theoretical is ~300 Mbps = ~37.5 MB/s = ~2250 MB/min, so cap at 3000 MB/min for safety
@@ -908,6 +984,12 @@ async function loadStarlinkAnomalyScore(seconds: number, step: number, fixedEnd:
     } else {
       starlinkAnomalyEvents.value = [];
     }
+
+    if (anomalySeries.value.length === 0 && starlinkAnomalyEvents.value.length === 0) {
+      console.warn('[anomalies] API returned no anomaly data; falling back to client computation.');
+      await computeLocalAnomalyFallback(seconds, step, fixedEnd);
+      return;
+    }
   } catch (err) {
     console.error('Failed to fetch starlink anomalies', err);
     await computeLocalAnomalyFallback(seconds, step, fixedEnd);
@@ -926,6 +1008,63 @@ function computeStdDev(values: number[]) {
   const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
   const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
   return Math.sqrt(variance);
+}
+
+function aggregateBytesPerSecondToMbPerMinute(series: Array<[number, number]>, bucketMs = 60_000): Array<[number, number]> {
+  if (!Array.isArray(series) || series.length < 2) return [];
+  const cleaned = series
+    .map(([ts, value]) => [Number(ts), Number(value)] as [number, number])
+    .filter(([ts, value]) => Number.isFinite(ts) && Number.isFinite(value) && ts >= 0)
+    .sort((a, b) => a[0] - b[0]);
+  if (cleaned.length < 2) return [];
+
+  const result: Array<[number, number]> = [];
+  let bucketStart = Math.floor(cleaned[0][0] / bucketMs) * bucketMs;
+  let bucketEnd = bucketStart + bucketMs;
+  let accBytes = 0;
+  let prevTs = cleaned[0][0];
+  let prevVal = Math.max(0, cleaned[0][1]);
+
+  for (let i = 1; i < cleaned.length; i++) {
+    let currTs = cleaned[i][0];
+    let currVal = Math.max(0, cleaned[i][1]);
+    if (!Number.isFinite(currVal)) currVal = prevVal;
+    if (currTs <= prevTs) continue;
+
+    let segStart = prevTs;
+    let segStartVal = prevVal;
+
+    while (segStart < currTs) {
+      const intervalEnd = Math.min(currTs, bucketEnd);
+      const span = intervalEnd - segStart;
+      if (span <= 0) break;
+      const ratio = span / (currTs - segStart);
+      const segEndVal = segStartVal + (currVal - segStartVal) * ratio;
+      const avgVal = (segStartVal + segEndVal) / 2;
+      accBytes += Math.max(0, avgVal) * (span / 1000);
+
+      if (intervalEnd === bucketEnd) {
+        result.push([bucketEnd, accBytes / 1_000_000]);
+        accBytes = 0;
+        bucketStart = bucketEnd;
+        bucketEnd += bucketMs;
+        segStart = intervalEnd;
+        segStartVal = segEndVal;
+      } else {
+        segStart = intervalEnd;
+        segStartVal = segEndVal;
+      }
+    }
+
+    prevTs = currTs;
+    prevVal = currVal;
+  }
+
+  if (accBytes > 0) {
+    result.push([bucketEnd, accBytes / 1_000_000]);
+  }
+
+  return result.map(([ts, mb]) => [ts, Math.max(0, mb)] as [number, number]);
 }
 
 function computeZscoreSeries(series: Array<[number, number]>, windowSamples: number) {
@@ -1297,6 +1436,9 @@ const benchRuns = ref<Array<{ task: string; start: number; end: number }>>([]);
 const anomalySeries = ref<Array<[number, number]>>([]);
 const starlinkAnomalyEvents = ref<Array<{ metric: string; timestamp: number; iso: string; value: number; zscore: number }>>([]);
 const starlinkEvents = ref<Array<{ time: string; timestamp: number; message: string; icon: string; color: string; type: string }>>([]);
+const downloadMbMinuteSeries = ref<Array<[number, number]>>([]);
+const uploadMbMinuteSeries = ref<Array<[number, number]>>([]);
+const transferSeriesSource = ref<'integrated' | 'promFallback' | 'none'>('none');
 
 // Diagnostic charts series
 const azimuthSeries = ref<Array<[number, number]>>([]);
@@ -1306,9 +1448,39 @@ const firstSlotSeries = ref<Array<[number, number]>>([]);
 
 const hasLatencyData = computed(() => latencySeries.value.length > 0 || packetLossSeries.value.length > 0);
 const hasBandwidthData = computed(() => bandwidthDownSeries.value.length > 0 || bandwidthUpSeries.value.length > 0 || microLossSeries.value.length > 0 || downMbPerMinSeries.value.length > 0 || upMbPerMinSeries.value.length > 0 || downMbPer10MinSeries.value.length > 0 || upMbPer10MinSeries.value.length > 0);
+const hasTransferData = computed(() => downloadMbMinuteSeries.value.length > 0 || uploadMbMinuteSeries.value.length > 0);
+const transferUsingPromFallback = computed(() => transferSeriesSource.value === 'promFallback');
+const transferMinutes = computed(() => Math.max(downloadMbMinuteSeries.value.length, uploadMbMinuteSeries.value.length));
+const totalDownloadMb = computed(() => downloadMbMinuteSeries.value.reduce((sum, [, value]) => sum + Math.max(0, Number(value)), 0));
+const totalUploadMb = computed(() => uploadMbMinuteSeries.value.reduce((sum, [, value]) => sum + Math.max(0, Number(value)), 0));
+const totalDownloadGb = computed(() => totalDownloadMb.value / 1024);
+const totalUploadGb = computed(() => totalUploadMb.value / 1024);
+const latestDownloadMbPerMinute = computed(() => latestFromSeries(downloadMbMinuteSeries.value));
+const latestUploadMbPerMinute = computed(() => latestFromSeries(uploadMbMinuteSeries.value));
+const avgDownloadMb = computed(() => {
+  const minutes = transferMinutes.value;
+  if (!minutes) return null;
+  const value = totalDownloadMb.value / minutes;
+  return Number.isFinite(value) ? value : null;
+});
+const avgUploadMb = computed(() => {
+  const minutes = transferMinutes.value;
+  if (!minutes) return null;
+  const value = totalUploadMb.value / minutes;
+  return Number.isFinite(value) ? value : null;
+});
 const hasAnomalyData = computed(() => anomalySeries.value.length > 0);
 const hasSpeedtestData = computed(() => speedtestDownSeries.value.length > 0 || speedtestUpSeries.value.length > 0);
 const hasFallbackSpeedData = computed(() => bandwidthDownSeries.value.length > 0 || bandwidthUpSeries.value.length > 0);
+const hasSpeedtestSeries = computed(() => speedtestDownSeries.value.length > 0 || speedtestUpSeries.value.length > 0);
+const latestSpeedtestDownSample = computed(() => latestFromSeries(speedtestDownSeries.value));
+const latestSpeedtestUpSample = computed(() => latestFromSeries(speedtestUpSeries.value));
+const latestSpeedtestSampleTimestamp = computed<number | null>(() => {
+  const series = speedtestDownSeries.value.length > 0 ? speedtestDownSeries.value : speedtestUpSeries.value;
+  if (!Array.isArray(series) || series.length === 0) return null;
+  const [ts] = series[series.length - 1];
+  return Number.isFinite(ts) ? ts : null;
+});
 const syntheticLastSuccess = computed<number | null>(() => {
   const raw = metrics.value.speedtestUpdated;
   const num = typeof raw === 'number' ? raw : Number(raw);
@@ -1351,24 +1523,32 @@ const speedtestCadenceLabel = computed(() => {
   const rem = minutes % 60;
   return rem ? `${hours}h ${rem}m` : `${hours}h`;
 });
+const speedtestStatusSuffix = computed(() => {
+  if (!hasSpeedtestSeries.value) return '';
+  if (showSyntheticSpeedtest.value) return ` · every ${speedtestCadenceLabel.value}`;
+  const ts = latestSpeedtestSampleTimestamp.value;
+  return ` · last run ${ts ? formatRelativeTimestamp(ts) : 'N/A'}`;
+});
+const currentSpeedtestDownload = computed(() => (
+  showSyntheticSpeedtest.value ? syntheticDownInstant.value : latestSpeedtestDownSample.value
+));
+const currentSpeedtestUpload = computed(() => (
+  showSyntheticSpeedtest.value ? syntheticUpInstant.value : latestSpeedtestUpSample.value
+));
+const speedtestTimestampDisplay = computed(() => {
+  if (showSyntheticSpeedtest.value) return formatRelativeTimestamp(metrics.value.speedtestUpdated);
+  const ts = latestSpeedtestSampleTimestamp.value;
+  return ts ? formatRelativeTimestamp(ts) : 'N/A';
+});
+const speedtestTimestampCaption = computed(() => (
+  showSyntheticSpeedtest.value ? 'Fresh iperf sample' : 'Last recorded run'
+));
 
 const latestFromSeries = (series: Array<[number, number]>) => {
   if (!Array.isArray(series) || series.length === 0) return null;
   const [, value] = series[series.length - 1];
   return Number.isFinite(value) ? value : null;
 };
-
-const displayDownloadMbps = computed<number | null>(() => {
-  if (showSyntheticSpeedtest.value && syntheticDownInstant.value !== null) return syntheticDownInstant.value;
-  const fallback = latestFromSeries(bandwidthDownSeries.value);
-  return fallback !== null ? fallback : null;
-});
-
-const displayUploadMbps = computed<number | null>(() => {
-  if (showSyntheticSpeedtest.value && syntheticUpInstant.value !== null) return syntheticUpInstant.value;
-  const fallback = latestFromSeries(bandwidthUpSeries.value);
-  return fallback !== null ? fallback : null;
-});
 
 const fallbackDownInstant = computed<number | null>(() => latestFromSeries(bandwidthDownSeries.value));
 const fallbackUpInstant = computed<number | null>(() => latestFromSeries(bandwidthUpSeries.value));
@@ -1822,6 +2002,42 @@ const anomalyOption = computed(() => {
       { type: 'line', name: 'Anomaly Score', data: anomalySeries.value, showSymbol: false, lineStyle: { width: 1.5 } },
       ...anomalySeriesEntries,
       ...heuristicSeriesEntries
+    ]
+  };
+});
+
+const heroTransferOption = computed(() => {
+  const downloadData = downloadMbMinuteSeries.value;
+  const uploadData = uploadMbMinuteSeries.value;
+  const combined = [...downloadData, ...uploadData];
+  const range = computeAxisRange(combined, 0.2, { min: 0, max: 50 }, { includeZero: true, minSpan: 1 });
+  return {
+    tooltip: {
+      trigger: 'axis',
+      valueFormatter: (value: number | string) => {
+        const num = Number(value);
+        return Number.isFinite(num) ? `${num.toFixed(2)} MB` : String(value ?? '');
+      }
+    },
+    grid: { left: 40, right: 20, top: 36, bottom: 24 },
+    legend: { top: 6, textStyle: { fontSize: 10 }, data: ['Download MB/min', 'Upload MB/min'] },
+    xAxis: {
+      type: 'time',
+      axisLabel: { color: '#667' },
+      axisLine: { lineStyle: { color: '#d2d7e5' } },
+      axisTick: { lineStyle: { color: '#d2d7e5' } }
+    },
+    yAxis: {
+      type: 'value',
+      name: 'MB/min',
+      nameLocation: 'middle',
+      nameGap: 40,
+      min: Math.max(0, range.min),
+      max: Math.max(range.max, 1)
+    },
+    series: [
+      { type: 'line', name: 'Download MB/min', data: downloadData, showSymbol: false, step: 'end', lineStyle: { width: 1.8, color: '#1a73e8' }, areaStyle: { color: 'rgba(26, 115, 232, 0.15)' } },
+      { type: 'line', name: 'Upload MB/min', data: uploadData, showSymbol: false, step: 'end', lineStyle: { width: 1.8, color: '#34a853' }, areaStyle: { color: 'rgba(52, 168, 83, 0.15)' } }
     ]
   };
 });

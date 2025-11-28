@@ -15,6 +15,10 @@ const repoRoot = resolve(__dirname, '..');
 const secretsDir = join(repoRoot, 'secrets');
 const logsDir = join(repoRoot, 'logs');
 const exporterRepoDefault = resolve(repoRoot, 'starlink_exporter');
+const scriptsDir = join(repoRoot, 'scripts');
+const wifiExporterTarget = process.env.WIFI_EXPORTER_TARGET || '127.0.0.1:9818';
+const speedtestExporterTarget = process.env.SPEEDTEST_EXPORTER_TARGET || '127.0.0.1:9820';
+const speedtestIntervalSeconds = Math.max(Number(process.env.SPEEDTEST_INTERVAL_SECONDS || 600), 60);
 
 function dquote(value) {
   return `"${String(value).replace(/(["\\$`])/g, '\\$1')}"`;
@@ -79,6 +83,67 @@ async function exporterFreshnessOk() {
   }
 }
 
+async function isWifiExporterUp(target = wifiExporterTarget) {
+  const { ok, text } = await httpGet(`http://${target}/metrics`, 1500);
+  if (!ok) return false;
+  return typeof text === 'string' && text.includes('windows_wifi_link_speed_mbps');
+}
+
+async function wifiExporterFreshnessOk() {
+  const r = await httpGet('http://127.0.0.1:9090/api/v1/query?query=timestamp(windows_wifi_link_speed_mbps)', 1500);
+  try {
+    if (!r.ok) return true;
+    const body = JSON.parse(r.text || '{}');
+    const results = Array.isArray(body?.data?.result) ? body.data.result : [];
+    if (results.length === 0) return false;
+    const latestTs = Math.max(
+      ...results
+        .map((item) => Number(item?.value?.[1]))
+        .filter((value) => Number.isFinite(value))
+    );
+    if (!Number.isFinite(latestTs)) return false;
+    const ageSec = Math.max(0, Date.now() / 1000 - latestTs);
+    return ageSec < 300;
+  } catch {
+    return true;
+  }
+}
+
+async function restartWifiExporter() {
+  await run(`bash ${dquote(join(scriptsDir, 'restart-wifi-exporter.sh'))}`);
+}
+
+async function isSpeedtestExporterUp(target = speedtestExporterTarget) {
+  const { ok, text } = await httpGet(`http://${target}/metrics`, 1500);
+  if (!ok) return false;
+  return typeof text === 'string' && text.includes('starlink_speedtest_last_run_status');
+}
+
+async function speedtestExporterFreshnessOk() {
+  const r = await httpGet('http://127.0.0.1:9090/api/v1/query?query=timestamp(starlink_speedtest_last_run_timestamp_seconds)', 1500);
+  try {
+    if (!r.ok) return true;
+    const body = JSON.parse(r.text || '{}');
+    const results = Array.isArray(body?.data?.result) ? body.data.result : [];
+    if (results.length === 0) return false;
+    const latestTs = Math.max(
+      ...results
+        .map((item) => Number(item?.value?.[1]))
+        .filter((value) => Number.isFinite(value))
+    );
+    if (!Number.isFinite(latestTs) || latestTs === 0) return false;
+    const ageSec = Math.max(0, Date.now() / 1000 - latestTs);
+    const allowable = Math.max(speedtestIntervalSeconds * 2, 900);
+    return ageSec < allowable;
+  } catch {
+    return true;
+  }
+}
+
+async function restartSpeedtestExporter() {
+  await run(`bash ${dquote(join(scriptsDir, 'restart-speedtest.sh'))}`);
+}
+
 async function startExporter() {
   // Try existing binary first; build if missing
   const bin = join(logsDir, 'starlink_exporter');
@@ -100,18 +165,32 @@ async function restartProm() {
   let exporterFail = 0;
   let promFail = 0;
   let staleFail = 0;
+  let wifiFail = 0;
+  let wifiStaleFail = 0;
+  let speedFail = 0;
+  let speedStaleFail = 0;
   const intervalMs = 10000; // 10s checks
+  const wifiStaleThreshold = 6; // ~1 minute
+  const speedStaleThreshold = 12; // ~2 minutes
   for (;;) {
     try {
-      const [eUp, pUp, fresh] = await Promise.all([
+      const [eUp, pUp, fresh, wifiUp, wifiFresh, speedUp, speedFresh] = await Promise.all([
         isExporterUp(starlinkTarget),
         isPrometheusUp(),
-        exporterFreshnessOk()
+        exporterFreshnessOk(),
+        isWifiExporterUp(),
+        wifiExporterFreshnessOk(),
+        isSpeedtestExporterUp(),
+        speedtestExporterFreshnessOk()
       ]);
 
       if (!eUp) exporterFail++; else exporterFail = 0;
       if (!pUp) promFail++; else promFail = 0;
       if (!fresh) staleFail++; else staleFail = 0;
+      if (!wifiUp) wifiFail++; else wifiFail = 0;
+      if (!wifiFresh) wifiStaleFail++; else wifiStaleFail = 0;
+      if (!speedUp) speedFail++; else speedFail = 0;
+      if (!speedFresh) speedStaleFail++; else speedStaleFail = 0;
 
       if (exporterFail >= 2) {
         console.log(`[watchdog] Exporter down. Restarting exporter...`);
@@ -131,6 +210,34 @@ async function restartProm() {
         console.log(`[watchdog] Exporter metrics stale. Restarting exporter...`);
         staleFail = 0;
         await startExporter();
+        await sleep(1500);
+      }
+
+      if (wifiFail >= 2) {
+        console.log('[watchdog] WiFi exporter down. Restarting...');
+        wifiFail = 0;
+        await restartWifiExporter();
+        await sleep(1000);
+      }
+
+      if (wifiStaleFail >= wifiStaleThreshold) {
+        console.log('[watchdog] WiFi exporter stale. Restarting...');
+        wifiStaleFail = 0;
+        await restartWifiExporter();
+        await sleep(1000);
+      }
+
+      if (speedFail >= 2) {
+        console.log('[watchdog] Speedtest exporter down. Restarting...');
+        speedFail = 0;
+        await restartSpeedtestExporter();
+        await sleep(1500);
+      }
+
+      if (speedStaleFail >= speedStaleThreshold) {
+        console.log('[watchdog] Speedtest exporter stale. Restarting...');
+        speedStaleFail = 0;
+        await restartSpeedtestExporter();
         await sleep(1500);
       }
     } catch (err) {
